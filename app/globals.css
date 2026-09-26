@@ -1,0 +1,125 @@
+@import "tailwindcss";
+
+/* ============================================================
+   Eleosstyles — design tokens (Tailwind v4 CSS-first theme)
+   Cream / Black / Gold only. Flat, minimal, no heavy shadows.
+   ============================================================ */
+@theme inline {
+  /* Brand palette */
+  --color-cream: #fbf7ee;
+  --color-surface: #fffdf8;
+  --color-line: #e9e1cd;
+  --color-brand-black: #111111;
+  --color-brand-gold: #b8912f;
+  --color-brand-gold-soft: #d9b45c;
+  --color-gold-deep: #8a6d1f;
+  --color-ink: #22262e;
+  --color-muted: #5a6472;
+
+  /* Type */
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, -apple-system,
+    "Segoe UI", Roboto, sans-serif;
+  --font-display: var(--font-playfair), "Playfair Display", Georgia, serif;
+
+  /* Radii — 8–12px, per brand spec */
+  --radius-card: 12px;
+  --radius-control: 10px;
+
+  /* Soft gold shimmer for loading states */
+  --animate-shimmer: shimmer 1.4s linear infinite;
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+body {
+  @apply bg-cream text-ink font-sans antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+::selection {
+  background: rgb(184 145 47 / 0.25);
+}
+
+/* Gold focus ring everywhere */
+:focus-visible {
+  outline: 2px solid #b8912f;
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Skeleton base + soft gold shimmer (never generic grey).
+   In @layer components so Tailwind utilities can still override them. */
+@layer components {
+  .skeleton {
+    background-color: #f2ead7;
+    border-radius: 8px;
+  }
+
+  .gold-shimmer {
+    background-image: linear-gradient(
+      90deg,
+      rgb(217 180 92 / 0) 0%,
+      rgb(217 180 92 / 0.3) 50%,
+      rgb(217 180 92 / 0) 100%
+    );
+    background-size: 200% 100%;
+    animation: shimmer 1.4s linear infinite;
+  }
+}
+
+/* Quiet number inputs (qty / price / discount) */
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+input[type="number"] {
+  appearance: textfield;
+  -moz-appearance: textfield;
+}
+
+/* Native color pickers used in Business Settings */
+input[type="color"] {
+  padding: 0;
+  border: none;
+  background: none;
+  cursor: pointer;
+}
+input[type="color"]::-webkit-color-swatch-wrapper {
+  padding: 0;
+}
+input[type="color"]::-webkit-color-swatch {
+  border: none;
+  border-radius: 8px;
+}
+
+/* ---- Print: receipt preview prints as the PDF ---- */
+@media print {
+  body {
+    background: #ffffff;
+  }
+  .no-print {
+    display: none !important;
+  }
+  .receipt-document {
+    border: 0 !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    max-width: none !important;
+    margin: 0 !important;
+  }
+  main {
+    padding: 0 !important;
+  }
+  @page {
+    size: A4;
+    margin: 12mm;
+  }
+}
