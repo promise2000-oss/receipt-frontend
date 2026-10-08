@@ -1,471 +1,588 @@
-import { computeTotals, round2 } from "./calc";
-import { createSeedState } from "./seed";
-import * as auth from "./auth";
 import type {
   Business,
   Customer,
   DashboardSummary,
+  PaymentMethod,
+  PaymentStatus,
   Receipt,
+  ReceiptChip,
   ReceiptFilters,
   ReceiptInput,
+  ReceiptStatus,
   SessionInfo,
   SignInInput,
   SignUpInput,
-  Workspace,
 } from "./types";
 
 /**
- * API-shaped mock client — mirrors the TRD §3.1 endpoints so the UI can
- * later swap this module for real REST calls without component changes.
+ * Client for the Eleosstyles receipt API.
  *
- *   POST   /auth/register    -> signUp()
- *   POST   /auth/login       -> signIn()
- *   POST   /auth/logout      -> signOut()
- *   GET    /auth/session     -> getSession()
- *   GET    /business/me        -> getBusiness()
- *   PATCH  /business/me        -> updateBusiness()
- *   GET    /customers          -> getCustomers()
- *   POST   /customers          -> createCustomer()
- *   GET    /receipts           -> getReceipts()
- *   GET    /receipts/:id       -> getReceipt()
- *   POST   /receipts           -> createReceipt()
- *   PATCH  /receipts/:id/void  -> voidReceipt()
- *   GET    /dashboard/summary  -> getDashboardSummary()
+ * All calls go to `/api/*` on *this* origin; `next.config.ts` rewrites them to
+ * `API_URL` from `.env`. The proxy is what makes auth possible — the API
+ * issues a `SameSite=Lax` session cookie, which browsers never send on a
+ * cross-site fetch, so the request has to be same-origin to carry it.
  *
- * Data is partitioned per organization: each account owns a workspace stored
- * under its own localStorage key, so one signed-in org never sees another
- * org's customers or receipts.
+ *   POST   /auth/signup              -> signUp()
+ *   POST   /auth/login               -> signIn()
+ *   POST   /auth/logout              -> signOut()
+ *   GET    /auth/me                  -> getSession()
+ *   GET    /business                 -> getBusiness()
+ *   PATCH  /business                 -> updateBusiness()
+ *   POST   /business/logo            -> uploadLogo()
+ *   DELETE /business/logo            -> removeLogo()
+ *   GET    /customers                -> getCustomers()
+ *   POST   /customers                -> createCustomer()
+ *   GET    /receipts                 -> getReceipts()
+ *   GET    /receipts/:id             -> getReceipt()
+ *   POST   /receipts                 -> createReceipt()
+ *   POST   /receipts/:id/void        -> voidReceipt()
+ *   GET    /receipts/:id/share       -> getShareLink()
+ *   GET    /dashboard/summary        -> getDashboardSummary()
+ *
+ * Responses arrive in the API's own shape (a `customer` object, a
+ * `void_reason`, paginated `{items, total}` lists…); the `to*` mappers below
+ * translate them into the UI's types so components stay untouched.
  */
 
-/** Workspace written by builds before org accounts existed. */
-const LEGACY_KEY = "eleosstyles.receipt-system.v1";
-const LATENCY_MS = 260;
+const API_BASE = "/api";
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-const workspaceKey = (accountId: string) =>
-  `eleosstyles.workspace.${accountId}`;
+/** Requests carry a page of 100 at most (the API caps `limit` at 100). */
+const PAGE_SIZE = 100;
+const MAX_PAGES = 10;
 
-const hasWindow = () => typeof window !== "undefined";
+/* -------------------------------- Errors -------------------------------- */
 
-/** Cached workspace for the *current* session only. */
-let memoryState: Workspace | null = null;
-let memoryAccountId: string | null = null;
+export class ApiError extends Error {
+  readonly status: number;
+  readonly code: string | undefined;
+  readonly details: Record<string, string> | undefined;
 
-/* ------------------------------- Storage ------------------------------- */
-
-function persist(state: Workspace): void {
-  memoryState = state;
-  const accountId = auth.getSession()?.account_id;
-  if (!hasWindow() || !accountId) return;
-  try {
-    window.localStorage.setItem(workspaceKey(accountId), JSON.stringify(state));
-  } catch {
-    /* storage unavailable — in-memory only */
+  constructor(
+    message: string,
+    status: number,
+    code?: string,
+    details?: Record<string, string>,
+  ) {
+    super(message);
+    this.name = "ApiError";
+    this.status = status;
+    this.code = code;
+    this.details = details;
   }
 }
 
-function readRaw(key: string): string | null {
-  if (!hasWindow()) return null;
-  try {
-    return window.localStorage.getItem(key);
-  } catch {
-    return null;
-  }
+/* ------------------------------ Wire types ------------------------------ */
+
+interface ApiBusiness {
+  id: string;
+  name: string;
+  logo_url: string | null;
+  address: string | null;
+  phone: string | null;
+  email: string | null;
+  currency: string;
+  brand_primary: string;
+  brand_accent: string;
+  number_prefix: string;
+  created_at: string;
 }
 
-function writeRaw(key: string, value: string): void {
-  if (!hasWindow()) return;
-  try {
-    window.localStorage.setItem(key, value);
-  } catch {
-    /* ignore */
-  }
+interface ApiCustomer {
+  id: string;
+  business_id: string;
+  name: string;
+  phone: string | null;
+  email: string | null;
+  created_at: string;
 }
 
-function removeRaw(key: string): void {
-  if (!hasWindow()) return;
-  try {
-    window.localStorage.removeItem(key);
-  } catch {
-    /* ignore */
-  }
+interface ApiReceiptItem {
+  id: string;
+  position: number;
+  description: string;
+  quantity: number;
+  unit_price: number;
+  line_total: number;
 }
 
-/** Fresh, unbranded workspace for a brand-new organization. */
-function emptyWorkspace(session: SessionInfo): Workspace {
+interface ApiReceipt {
+  id: string;
+  business_id: string;
+  customer_id: string | null;
+  customer: {
+    id: string;
+    name: string;
+    phone: string | null;
+    email: string | null;
+  } | null;
+  receipt_number: string;
+  issue_date: string;
+  subtotal: number;
+  discount: number;
+  total: number;
+  paid_amount: number;
+  payment_method: PaymentMethod;
+  payment_status: PaymentStatus;
+  status: ReceiptStatus;
+  notes: string | null;
+  pdf_url: string | null;
+  voided_at: string | null;
+  void_reason: string | null;
+  original_receipt_id: string | null;
+  created_by: string;
+  created_at: string;
+  items: ApiReceiptItem[];
+}
+
+interface ApiAuth {
+  user: {
+    id: string;
+    business_id: string;
+    full_name: string;
+    email: string;
+  };
+  business: ApiBusiness;
+}
+
+interface ApiList<T> {
+  items: T[];
+  total: number;
+}
+
+interface ApiTotals {
+  count: number;
+  total: number;
+}
+
+interface ApiDashboard {
+  currency: string;
+  today: ApiTotals;
+  week: ApiTotals;
+  month: ApiTotals;
+  outstanding: ApiTotals;
+  recent: ApiReceipt[];
+}
+
+interface ApiShare {
+  token: string;
+  url: string;
+  expires_at: string;
+}
+
+/* -------------------------------- Transport ------------------------------ */
+
+async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
+  const headers = new Headers(init.headers);
+  // FormData must keep its own multipart boundary header.
+  if (init.body != null && !(init.body instanceof FormData) && !headers.has("Content-Type")) {
+    headers.set("Content-Type", "application/json");
+  }
+
+  let response: Response;
+  try {
+    response = await fetch(`${API_BASE}${path}`, {
+      ...init,
+      headers,
+      credentials: "same-origin",
+    });
+  } catch {
+    throw new ApiError(
+      "Can't reach the receipt service. Check your connection and try again.",
+      0,
+      "NETWORK_ERROR",
+    );
+  }
+
+  const text = await response.text();
+  let payload: unknown = null;
+  if (text) {
+    try {
+      payload = JSON.parse(text);
+    } catch {
+      payload = null;
+    }
+  }
+
+  if (!response.ok) {
+    const problem = (payload ?? {}) as {
+      message?: string;
+      code?: string;
+      details?: Record<string, string>;
+    };
+    throw new ApiError(
+      problem.message ?? `The receipt service returned an error (${response.status}).`,
+      response.status,
+      problem.code,
+      problem.details,
+    );
+  }
+
+  return payload as T;
+}
+
+const jsonBody = (value: unknown): string => JSON.stringify(value);
+
+/* -------------------------------- Mappers -------------------------------- */
+
+function toBusiness(value: ApiBusiness): Business {
   return {
-    business: {
-      id: `b_${crypto.randomUUID().slice(0, 8)}`,
-      name: session.org_name,
-      logo_url: null,
-      address: "",
-      phone: "",
-      email: session.email,
-      currency: "NGN",
-      brand_primary: "#111111",
-      brand_accent: "#B8912F",
-      created_at: new Date().toISOString(),
-    },
-    customers: [],
-    receipts: [],
+    id: value.id,
+    name: value.name,
+    logo_url: value.logo_url,
+    address: value.address ?? "",
+    phone: value.phone ?? "",
+    email: value.email ?? "",
+    currency: value.currency,
+    brand_primary: value.brand_primary,
+    brand_accent: value.brand_accent,
+    created_at: value.created_at,
   };
 }
+
+function toCustomer(value: ApiCustomer): Customer {
+  return {
+    id: value.id,
+    business_id: value.business_id,
+    name: value.name,
+    phone: value.phone ?? null,
+    email: value.email ?? null,
+    created_at: value.created_at,
+  };
+}
+
+function toReceipt(value: ApiReceipt): Receipt {
+  return {
+    id: value.id,
+    business_id: value.business_id,
+    customer_id: value.customer_id,
+    receipt_number: value.receipt_number,
+    issue_date: value.issue_date,
+    customer_name: value.customer?.name ?? "Walk-in customer",
+    customer_phone: value.customer?.phone ?? null,
+    customer_email: value.customer?.email ?? null,
+    items: (value.items ?? []).map((item) => ({
+      id: item.id,
+      receipt_id: value.id,
+      description: item.description,
+      quantity: item.quantity,
+      unit_price: item.unit_price,
+      line_total: item.line_total,
+    })),
+    subtotal: value.subtotal,
+    discount: value.discount,
+    total: value.total,
+    payment_method: value.payment_method,
+    payment_status: value.payment_status,
+    status: value.status,
+    void_note: value.void_reason ?? null,
+    voided_at: value.voided_at ?? null,
+    notes: value.notes ?? null,
+    created_by: value.created_by,
+    created_at: value.created_at,
+  };
+}
+
+function toSession(value: ApiAuth): SessionInfo {
+  return {
+    account_id: value.user.id,
+    org_name: value.business.name,
+    owner_name: value.user.full_name,
+    email: value.user.email,
+  };
+}
+
+/* --------------------------------- Dates --------------------------------- */
+
+/** Local `YYYY-MM-DD` — what the API's `from`/`to` filters expect. */
+function isoDate(date: Date): string {
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${date.getFullYear()}-${month}-${day}`;
+}
+
+function startOf(period: "today" | "week" | "month"): Date {
+  const now = new Date();
+  now.setHours(0, 0, 0, 0);
+  if (period === "today") return now;
+  if (period === "month") {
+    now.setDate(1);
+    return now;
+  }
+  const daysSinceMonday = (now.getDay() + 6) % 7; // week starts Monday
+  now.setDate(now.getDate() - daysSinceMonday);
+  return now;
+}
+
+/* ------------------------------ Receipt ids ------------------------------ */
 
 /**
- * The signed-in org's workspace. On a miss it claims whatever was already on
- * this browser (pre-account data, or the demo seed on a fresh install) and
- * re-badges it with the new organization's name.
+ * Routes address receipts as `ES-000001` but the API only resolves UUIDs, so
+ * human-facing references go through a search first.
  */
-function loadState(): Workspace {
-  const accountId = auth.getSession()?.account_id;
+async function resolveReceiptId(idOrNumber: string): Promise<string | null> {
+  if (UUID_RE.test(idOrNumber)) return idOrNumber;
 
-  // Signed out: hand back an empty shell — the shell gate redirects away.
-  if (!accountId) {
-    if (!memoryState) memoryState = emptyWorkspace(placeholderSession());
-    return memoryState;
-  }
-
-  if (memoryState && memoryAccountId === accountId) return memoryState;
-
-  const stored = readRaw(workspaceKey(accountId));
-  if (stored) {
-    try {
-      memoryState = JSON.parse(stored) as Workspace;
-      memoryAccountId = accountId;
-      return memoryState;
-    } catch {
-      /* fall through and re-provision */
-    }
-  }
-
-  const session = auth.getSession()!;
-  const legacy = readRaw(LEGACY_KEY);
-  let state: Workspace;
-
-  if (legacy) {
-    try {
-      state = JSON.parse(legacy) as Workspace;
-      state.business = { ...state.business, name: session.org_name };
-      removeRaw(LEGACY_KEY);
-    } catch {
-      state = emptyWorkspace(session);
-    }
-  } else {
-    state = emptyWorkspace(session);
-  }
-
-  persist(state);
-  memoryAccountId = accountId;
-  return state;
+  const list = await request<ApiList<ApiReceipt>>(
+    `/receipts?search=${encodeURIComponent(idOrNumber)}&limit=${PAGE_SIZE}`,
+  );
+  const exact = list.items.find((item) => item.receipt_number === idOrNumber);
+  if (exact) return exact.id;
+  return list.items.length === 1 ? list.items[0].id : null;
 }
 
-function placeholderSession(): SessionInfo {
-  return {
-    account_id: "",
-    org_name: "",
-    owner_name: "",
-    email: "",
-  };
-}
+/* ------------------------------- Collections ----------------------------- */
 
-/** Forget the cached workspace — called whenever the session changes. */
-function resetState(): void {
-  memoryState = null;
-  memoryAccountId = null;
-}
+const normalise = (value: string | undefined | null) =>
+  (value ?? "").replace(/\s+/g, "").toLowerCase();
 
-const wait = (ms: number = LATENCY_MS) =>
-  new Promise<void>((resolve) => setTimeout(resolve, ms));
-
-function nextReceiptNumber(receipts: Receipt[]): string {
-  const max = receipts.reduce((highest, receipt) => {
-    const value = Number(receipt.receipt_number.replace(/\D/g, ""));
-    return Number.isFinite(value) ? Math.max(highest, value) : highest;
-  }, 0);
-  return `ES-${String(max + 1).padStart(6, "0")}`;
-}
-
-function startOfDay(date: Date): Date {
-  const copy = new Date(date);
-  copy.setHours(0, 0, 0, 0);
-  return copy;
-}
-
-function startOfWeek(date: Date): Date {
-  const copy = startOfDay(date);
-  const weekday = copy.getDay(); // 0 = Sunday
-  const daysSinceMonday = (weekday + 6) % 7;
-  copy.setDate(copy.getDate() - daysSinceMonday);
-  return copy;
-}
-
-function startOfMonth(date: Date): Date {
-  const copy = startOfDay(date);
-  copy.setDate(1);
-  return copy;
-}
-
-function within(iso: string, since: Date): boolean {
-  return new Date(iso).getTime() >= since.getTime();
-}
+/** Fields `PATCH /business` accepts — `logo_url` is set by its own endpoint. */
+const BUSINESS_FIELDS = [
+  "name",
+  "address",
+  "phone",
+  "email",
+  "currency",
+  "brand_primary",
+  "brand_accent",
+] as const;
 
 export const api = {
   /* ------------------------------ Accounts ------------------------------ */
 
-  /**
-   * Register an organization. The first account created on this browser
-   * adopts the workspace already present here (your data, or the demo seed
-   * on a fresh install); every later account starts with a clean workspace.
-   */
   async signUp(input: SignUpInput): Promise<SessionInfo> {
-    const isFirstAccount = !auth.hasAnyAccount();
-    const session = await auth.signUp(input);
-    resetState();
-
-    if (isFirstAccount) {
-      // Adopt whatever is on this browser under the new account's key.
-      const legacy = readRaw(LEGACY_KEY);
-      if (legacy) {
-        writeRaw(workspaceKey(session.account_id), legacy);
-        removeRaw(LEGACY_KEY);
-      } else if (!readRaw(workspaceKey(session.account_id))) {
-        writeRaw(
-          workspaceKey(session.account_id),
-          JSON.stringify(createSeedState()),
-        );
-      }
-    }
-
-    const state = loadState();
-    // Claimed data keeps its receipts but is re-badged with the new org name.
-    if (state.business.name !== session.org_name) {
-      persist({ ...state, business: { ...state.business, name: session.org_name } });
-    }
-
-    return session;
+    const auth = await request<ApiAuth>("/auth/signup", {
+      method: "POST",
+      body: jsonBody({
+        business: { name: input.org_name.trim() },
+        user: {
+          full_name: input.owner_name.trim(),
+          email: input.email.trim().toLowerCase(),
+          password: input.password,
+        },
+      }),
+    });
+    return toSession(auth);
   },
 
   async signIn(input: SignInInput): Promise<SessionInfo> {
-    const session = await auth.signIn(input);
-    resetState();
-    loadState();
-    return session;
+    const auth = await request<ApiAuth>("/auth/login", {
+      method: "POST",
+      body: jsonBody({
+        email: input.email.trim().toLowerCase(),
+        password: input.password,
+      }),
+    });
+    return toSession(auth);
   },
 
-  signOut(): void {
-    auth.signOut();
-    resetState();
+  /** Clears the session cookie. Best-effort: the UI signs out either way. */
+  async signOut(): Promise<void> {
+    try {
+      await request("/auth/logout", { method: "POST" });
+    } catch {
+      /* already signed out, or the service is unreachable */
+    }
   },
 
-  getSession(): SessionInfo | null {
-    return auth.getSession();
+  /** The signed-in organization, or null when the session cookie is absent. */
+  async getSession(): Promise<SessionInfo | null> {
+    try {
+      return toSession(await request<ApiAuth>("/auth/me"));
+    } catch {
+      return null;
+    }
   },
 
-  /* ---------------- Business ---------------- */
+  /* ------------------------------- Business ------------------------------ */
 
   async getBusiness(): Promise<Business> {
-    await wait();
-    return { ...loadState().business };
+    return toBusiness(await request<ApiBusiness>("/business"));
   },
 
   async updateBusiness(patch: Partial<Business>): Promise<Business> {
-    await wait(220);
-    const state = loadState();
-    const business = { ...state.business, ...patch };
-    persist({ ...state, business });
-    return { ...business };
+    const body: Record<string, string> = {};
+    for (const field of BUSINESS_FIELDS) {
+      const value = patch[field];
+      if (typeof value === "string") body[field] = value;
+    }
+    if (Object.keys(body).length === 0) return api.getBusiness();
+    return toBusiness(
+      await request<ApiBusiness>("/business", {
+        method: "PATCH",
+        body: jsonBody(body),
+      }),
+    );
   },
 
-  /* ---------------- Customers ---------------- */
+  /** Multipart upload — max 3 MB, PNG/JPEG/WebP/SVG/GIF. */
+  async uploadLogo(file: File): Promise<Business> {
+    const form = new FormData();
+    form.append("logo", file, file.name);
+    return toBusiness(
+      await request<ApiBusiness>("/business/logo", { method: "POST", body: form }),
+    );
+  },
+
+  async removeLogo(): Promise<Business> {
+    return toBusiness(
+      await request<ApiBusiness>("/business/logo", { method: "DELETE" }),
+    );
+  },
+
+  /* ------------------------------- Customers ----------------------------- */
 
   async getCustomers(): Promise<Customer[]> {
-    await wait();
-    return [...loadState().customers].sort((a, b) =>
-      a.name.localeCompare(b.name),
-    );
+    const list = await request<ApiList<ApiCustomer>>("/customers");
+    return list.items
+      .map(toCustomer)
+      .sort((a, b) => a.name.localeCompare(b.name));
   },
 
   async createCustomer(
     input: Pick<Customer, "name"> & Partial<Pick<Customer, "phone" | "email">>,
   ): Promise<Customer> {
-    await wait(200);
-    const state = loadState();
-    const customer: Customer = {
-      id: `c_${crypto.randomUUID().slice(0, 8)}`,
-      business_id: state.business.id,
-      name: input.name.trim(),
-      phone: input.phone?.trim() || null,
-      email: input.email?.trim() || null,
-      created_at: new Date().toISOString(),
-    };
-    persist({ ...state, customers: [...state.customers, customer] });
-    return customer;
+    return toCustomer(
+      await request<ApiCustomer>("/customers", {
+        method: "POST",
+        body: jsonBody({
+          name: input.name.trim(),
+          phone: input.phone?.trim() || null,
+          email: input.email?.trim() || null,
+        }),
+      }),
+    );
   },
 
-  /* ---------------- Receipts ---------------- */
+  /* -------------------------------- Receipts ------------------------------ */
 
   async getReceipts(filters: ReceiptFilters = {}): Promise<Receipt[]> {
-    await wait();
-    const now = new Date();
-    const query = filters.q?.trim().toLowerCase();
-    const chip = filters.chip ?? "all";
+    const params = new URLSearchParams();
+    const query = filters.q?.trim();
+    if (query) params.set("search", query);
 
-    return loadState()
-      .receipts.filter((receipt) => {
-        if (chip === "void" && receipt.status !== "void") return false;
-        if (chip !== "all" && chip !== "void") {
-          if (receipt.status !== "active" || receipt.payment_status !== chip) {
-            return false;
-          }
-        }
-        if (filters.period === "today" && !within(receipt.issue_date, startOfDay(now))) {
-          return false;
-        }
-        if (filters.period === "week" && !within(receipt.issue_date, startOfWeek(now))) {
-          return false;
-        }
-        if (filters.period === "month" && !within(receipt.issue_date, startOfMonth(now))) {
-          return false;
-        }
-        if (query) {
-          const haystack = [
-            receipt.customer_name,
-            receipt.receipt_number,
-            receipt.total.toFixed(2),
-            receipt.items.map((item) => item.description).join(" "),
-          ]
-            .join(" ")
-            .toLowerCase();
-          if (!haystack.includes(query)) return false;
-        }
-        return true;
-      })
-      .sort((a, b) => b.issue_date.localeCompare(a.issue_date));
+    const chip: ReceiptChip = filters.chip ?? "all";
+    if (chip === "void") {
+      params.set("status", "void");
+    } else if (chip !== "all") {
+      params.set("status", "active");
+      params.set("payment_status", chip);
+    }
+
+    if (filters.period && filters.period !== "all") {
+      params.set("from", isoDate(startOf(filters.period)));
+    }
+
+    params.set("limit", String(PAGE_SIZE));
+
+    const receipts: Receipt[] = [];
+    for (let page = 1; page <= MAX_PAGES; page += 1) {
+      params.set("page", String(page));
+      const batch = await request<ApiList<ApiReceipt>>(`/receipts?${params}`);
+      receipts.push(...batch.items.map(toReceipt));
+      if (batch.items.length < PAGE_SIZE) break;
+    }
+
+    return receipts.sort((a, b) => b.issue_date.localeCompare(a.issue_date));
   },
 
-  async getReceipt(id: string): Promise<Receipt | null> {
-    await wait();
-    const receipt = loadState().receipts.find(
-      (item) => item.id === id || item.receipt_number === id,
-    );
-    return receipt ? { ...receipt, items: [...receipt.items] } : null;
+  /** Accepts either the receipt's UUID or its `ES-000001` number. */
+  async getReceipt(idOrNumber: string): Promise<Receipt | null> {
+    const id = await resolveReceiptId(idOrNumber);
+    if (!id) return null;
+    try {
+      return toReceipt(await request<ApiReceipt>(`/receipts/${id}`));
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 404) return null;
+      throw error;
+    }
   },
 
   async createReceipt(input: ReceiptInput): Promise<Receipt> {
-    await wait(420);
-    const state = loadState();
-    const accountId = auth.getSession()?.account_id ?? "";
+    let customerId = input.customer.id ?? null;
 
-    // Resolve an existing customer (by id, phone, or name) or create one.
-    const normalise = (value: string | undefined) => (value ?? "").replace(/\s+/g, "").toLowerCase();
-    let customer = state.customers.find(
-      (item) =>
-        (input.customer.id && item.id === input.customer.id) ||
-        (input.customer.phone && item.phone && normalise(item.phone) === normalise(input.customer.phone)) ||
-        normalise(item.name) === normalise(input.customer.name),
-    );
-
-    if (!customer) {
-      customer = {
-        id: `c_${crypto.randomUUID().slice(0, 8)}`,
-        business_id: state.business.id,
-        name: input.customer.name.trim(),
-        phone: input.customer.phone?.trim() || null,
-        email: input.customer.email?.trim() || null,
-        created_at: new Date().toISOString(),
-      };
+    // Reuse an existing customer when the details match, otherwise save them.
+    if (!customerId) {
+      const name = input.customer.name.trim();
+      const phone = input.customer.phone?.trim() || null;
+      const customers = await api.getCustomers();
+      const match = customers.find(
+        (customer) =>
+          (phone &&
+            customer.phone &&
+            normalise(customer.phone) === normalise(phone)) ||
+          normalise(customer.name) === normalise(name),
+      );
+      customerId = match
+        ? match.id
+        : (
+            await api.createCustomer({
+              name,
+              phone: phone ?? undefined,
+              email: input.customer.email,
+            })
+          ).id;
     }
 
-    const receiptNumber = nextReceiptNumber(state.receipts);
-    const totals = computeTotals(input.items, input.discount, input.tax_rate);
-    const now = new Date().toISOString();
+    const created = await request<ApiReceipt>("/receipts", {
+      method: "POST",
+      body: jsonBody({
+        customer_id: customerId,
+        items: input.items.map((item) => ({
+          description: item.description.trim(),
+          quantity: item.quantity,
+          unit_price: item.unit_price,
+        })),
+        discount: input.discount,
+        payment_method: input.payment_method,
+        payment_status: input.payment_status,
+        notes: input.notes?.trim() || null,
+      }),
+    });
 
-    const receipt: Receipt = {
-      id: receiptNumber,
-      business_id: state.business.id,
-      customer_id: customer.id,
-      receipt_number: receiptNumber,
-      issue_date: now,
-      customer_name: customer.name,
-      customer_phone: customer.phone,
-      customer_email: customer.email,
-      items: input.items.map((item, index) => ({
-        id: `${receiptNumber}-i${index + 1}`,
-        receipt_id: receiptNumber,
-        description: item.description.trim(),
-        quantity: Number(item.quantity),
-        unit_price: round2(Number(item.unit_price)),
-        line_total: round2(Number(item.quantity) * Number(item.unit_price)),
-      })),
-      subtotal: totals.subtotal,
-      discount: totals.discount,
-      tax: totals.tax,
-      total: totals.total,
-      payment_method: input.payment_method,
-      payment_status: input.payment_status,
-      status: "active",
-      void_note: null,
-      voided_at: null,
-      notes: input.notes?.trim() || null,
-      created_by: accountId,
-      created_at: now,
-    };
-
-    const customers = state.customers.some((item) => item.id === customer!.id)
-      ? state.customers
-      : [...state.customers, customer];
-
-    persist({ ...state, customers, receipts: [...state.receipts, receipt] });
-    return { ...receipt, items: [...receipt.items] };
+    return toReceipt(created);
   },
 
-  async voidReceipt(id: string, note: string): Promise<Receipt | null> {
-    await wait(300);
-    const state = loadState();
-    const receipt = state.receipts.find(
-      (item) => item.id === id || item.receipt_number === id,
-    );
-    if (!receipt) return null;
-
-    receipt.status = "void";
-    receipt.void_note = note;
-    receipt.voided_at = new Date().toISOString();
-    persist({ ...state });
-    return { ...receipt };
+  /** Returns null when the receipt is missing or already voided. */
+  async voidReceipt(idOrNumber: string, reason: string): Promise<Receipt | null> {
+    const id = await resolveReceiptId(idOrNumber);
+    if (!id) return null;
+    try {
+      return toReceipt(
+        await request<ApiReceipt>(`/receipts/${id}/void`, {
+          method: "POST",
+          body: jsonBody({ reason }),
+        }),
+      );
+    } catch (error) {
+      if (
+        error instanceof ApiError &&
+        (error.status === 404 || error.status === 409)
+      ) {
+        return null;
+      }
+      throw error;
+    }
   },
 
-  /* ---------------- Dashboard ---------------- */
+  /** Public, expiring link to the receipt page — used by the QR and share row. */
+  async getShareLink(idOrNumber: string): Promise<string> {
+    const id = await resolveReceiptId(idOrNumber);
+    if (!id) throw new ApiError("Receipt not found.", 404, "NOT_FOUND");
+    const share = await request<ApiShare>(`/receipts/${id}/share`);
+    return share.url;
+  },
+
+  /* -------------------------------- Dashboard ----------------------------- */
 
   async getDashboardSummary(): Promise<DashboardSummary> {
-    await wait();
-    const state = loadState();
-    const now = new Date();
-    const windows = {
-      today: startOfDay(now),
-      week: startOfWeek(now),
-      month: startOfMonth(now),
-    };
-
-    const active = state.receipts.filter((receipt) => receipt.status === "active");
-    const totalFor = (since: Date) =>
-      active
-        .filter((receipt) => within(receipt.issue_date, since))
-        .reduce(
-          (acc, receipt) => ({
-            total: round2(acc.total + receipt.total),
-            count: acc.count + 1,
-          }),
-          { total: 0, count: 0 },
-        );
-
-    const recent = [...state.receipts]
-      .sort((a, b) => b.issue_date.localeCompare(a.issue_date))
-      .slice(0, 6);
-
+    const summary = await request<ApiDashboard>("/dashboard/summary");
     return {
-      today: totalFor(windows.today),
-      week: totalFor(windows.week),
-      month: totalFor(windows.month),
-      recent,
+      today: summary.today,
+      week: summary.week,
+      month: summary.month,
+      recent: (summary.recent ?? []).map(toReceipt),
     };
   },
 };

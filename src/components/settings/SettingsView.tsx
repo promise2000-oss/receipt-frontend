@@ -17,6 +17,8 @@ import { cn } from "@/lib/cn";
 const HEX = /^#([0-9a-f]{6})$/i;
 const DEFAULT_PRIMARY = "#111111";
 const DEFAULT_ACCENT = "#B8912F";
+/** `POST /business/logo` rejects anything larger. */
+const MAX_LOGO_BYTES = 3 * 1024 * 1024;
 
 const CURRENCIES = [
   { value: "NGN", label: "NGN — Naira (₦)" },
@@ -187,18 +189,29 @@ export function SettingsView() {
 
   useEffect(() => {
     let cancelled = false;
-    api.getBusiness().then((business: Business) => {
-      if (cancelled) return;
-      setName(business.name);
-      setAddress(business.address);
-      setPhone(business.phone);
-      setEmail(business.email);
-      setCurrency(business.currency);
-      setLogo(business.logo_url);
-      setPrimary(business.brand_primary);
-      setAccent(business.brand_accent);
-      setLoading(false);
-    });
+    api
+      .getBusiness()
+      .then((business: Business) => {
+        if (cancelled) return;
+        setName(business.name);
+        setAddress(business.address);
+        setPhone(business.phone);
+        setEmail(business.email);
+        setCurrency(business.currency);
+        setLogo(business.logo_url);
+        setPrimary(business.brand_primary);
+        setAccent(business.brand_accent);
+        setLoading(false);
+      })
+      .catch((caught: unknown) => {
+        if (cancelled) return;
+        setLoading(false);
+        setError(
+          caught instanceof Error
+            ? caught.message
+            : "Couldn't load your business settings.",
+        );
+      });
     return () => {
       cancelled = true;
     };
@@ -207,35 +220,48 @@ export function SettingsView() {
   async function onFileChange(file: File | undefined) {
     if (!file) return;
     if (!file.type.startsWith("image/")) {
-      setError("Please choose an image file (PNG or JPG).");
+      setError("Please choose an image file (PNG, JPG, WebP, SVG or GIF).");
+      return;
+    }
+    if (file.size > MAX_LOGO_BYTES) {
+      setError("That image is over 3 MB — please pick a smaller one.");
       return;
     }
     setError(null);
-    const dataUrl = await readImageAsDataUrl(file, 320);
-    setLogo(dataUrl);
+
+    // Show it straight away, then swap in the signed URL the API returns.
+    setLogo(await readImageAsDataUrl(file, 320));
 
     // Save immediately — the whole point is that the next receipt (and its
     // print/PDF) picks the logo up without a second click.
     setLogoStatus("saving");
     try {
-      await api.updateBusiness({ logo_url: dataUrl });
+      const business = await api.uploadLogo(file);
+      setLogo(business.logo_url);
       setLogoStatus("saved");
       setTimeout(() => setLogoStatus("idle"), 2600);
-    } catch {
+    } catch (caught) {
+      setLogo(null);
       setLogoStatus("error");
-      setError("Couldn't save the logo — press “Save changes” to retry.");
+      setError(
+        caught instanceof Error ? caught.message : "Couldn't save the logo.",
+      );
     }
   }
 
   async function onRemoveLogo() {
+    const previous = logo;
     setLogo(null);
     setLogoStatus("saving");
     try {
-      await api.updateBusiness({ logo_url: null });
+      await api.removeLogo();
       setLogoStatus("idle");
-    } catch {
+    } catch (caught) {
+      setLogo(previous);
       setLogoStatus("error");
-      setError("Couldn't remove the logo — press “Save changes” to retry.");
+      setError(
+        caught instanceof Error ? caught.message : "Couldn't remove the logo.",
+      );
     }
   }
 
@@ -251,19 +277,25 @@ export function SettingsView() {
     }
     setError(null);
     setSaving(true);
-    await api.updateBusiness({
-      name: name.trim(),
-      address: address.trim(),
-      phone: phone.trim(),
-      email: email.trim(),
-      currency,
-      logo_url: logo,
-      brand_primary: primary.toLowerCase(),
-      brand_accent: accent.toLowerCase(),
-    });
-    setSaving(false);
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2400);
+    try {
+      await api.updateBusiness({
+        name: name.trim(),
+        address: address.trim(),
+        phone: phone.trim(),
+        email: email.trim(),
+        currency,
+        brand_primary: primary.toLowerCase(),
+        brand_accent: accent.toLowerCase(),
+      });
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2400);
+    } catch (caught) {
+      setError(
+        caught instanceof Error ? caught.message : "Couldn't save your changes.",
+      );
+    } finally {
+      setSaving(false);
+    }
   }
 
   if (loading) {
@@ -463,7 +495,7 @@ export function SettingsView() {
                 {session?.owner_name} · {session?.email}
               </p>
             </div>
-            <Button variant="outline" onClick={signOut}>
+            <Button variant="outline" onClick={() => void signOut()}>
               <LogOut className="h-4 w-4" strokeWidth={1.9} />
               Sign out
             </Button>

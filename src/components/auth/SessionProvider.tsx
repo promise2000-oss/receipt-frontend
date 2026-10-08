@@ -9,7 +9,6 @@ import {
   type ReactNode,
 } from "react";
 import { api } from "@/lib/api";
-import { AuthError } from "@/lib/auth";
 import type { SessionInfo, SignInInput, SignUpInput } from "@/lib/types";
 
 export type SessionStatus = "loading" | "authenticated" | "unauthenticated";
@@ -19,7 +18,7 @@ interface SessionContextValue {
   status: SessionStatus;
   signIn: (input: SignInInput) => Promise<void>;
   signUp: (input: SignUpInput) => Promise<void>;
-  signOut: () => void;
+  signOut: () => Promise<void>;
 }
 
 const SessionContext = createContext<SessionContextValue | null>(null);
@@ -27,9 +26,9 @@ const SessionContext = createContext<SessionContextValue | null>(null);
 /**
  * Holds the signed-in organization for the whole app.
  *
- * The session lives in localStorage (there is no backend yet), so we read it
- * once on mount — starting at "loading" keeps server and client markup
- * identical on first paint.
+ * The session is an httpOnly cookie the API sets, so there is nothing to read
+ * locally — we resolve it by asking `GET /auth/me` once on mount. Starting at
+ * "loading" keeps server and client markup identical on first paint.
  */
 export function SessionProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<SessionInfo | null>(null);
@@ -37,11 +36,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     let cancelled = false;
-    // Deferred one tick so the first (hydrated) render matches the server
-    // markup, which always renders the "loading" state.
-    Promise.resolve().then(() => {
+    api.getSession().then((current) => {
       if (cancelled) return;
-      const current = api.getSession();
       setSession(current);
       setStatus(current ? "authenticated" : "unauthenticated");
     });
@@ -62,8 +58,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     setStatus("authenticated");
   }, []);
 
-  const signOut = useCallback(() => {
-    api.signOut();
+  const signOut = useCallback(async () => {
+    await api.signOut();
     setSession(null);
     setStatus("unauthenticated");
   }, []);
@@ -84,5 +80,3 @@ export function useSession(): SessionContextValue {
   }
   return value;
 }
-
-export { AuthError };

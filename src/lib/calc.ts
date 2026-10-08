@@ -12,7 +12,6 @@ export interface LineItem {
 export interface Totals {
   subtotal: number;
   discount: number;
-  tax: number;
   total: number;
 }
 
@@ -20,17 +19,11 @@ export function lineTotal(item: LineItem): number {
   return round2((Number(item.quantity) || 0) * (Number(item.unit_price) || 0));
 }
 
-export function computeTotals(
-  items: LineItem[],
-  discount: number,
-  taxRate: number,
-): Totals {
+export function computeTotals(items: LineItem[], discount: number): Totals {
   const subtotal = round2(items.reduce((sum, item) => sum + lineTotal(item), 0));
   const safeDiscount = round2(Math.min(Math.max(Number(discount) || 0, 0), subtotal));
-  const taxable = round2(subtotal - safeDiscount);
-  const tax = round2(taxable * ((Number(taxRate) || 0) / 100));
-  const total = round2(taxable + tax);
-  return { subtotal, discount: safeDiscount, tax, total };
+  const total = round2(subtotal - safeDiscount);
+  return { subtotal, discount: safeDiscount, total };
 }
 
 export function round2(value: number): number {

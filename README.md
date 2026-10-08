@@ -10,6 +10,7 @@ Built with **Next.js (App Router) · TypeScript · Tailwind CSS v4**.
 
 ```bash
 npm install
+cp .env.example .env    # points the app at the receipt API
 npm run dev
 ```
 
@@ -30,7 +31,7 @@ npm run lint    # ESLint
 | `/signup` | Create an organization — org name, your name, email, password |
 | `/login` | Sign in to an existing organization |
 | `/` | Dashboard — today / week / month totals + recent receipts |
-| `/receipts/new` | Issue a receipt — customer picker, live line totals, discount & tax, payment status |
+| `/receipts/new` | Issue a receipt — customer picker, live line totals, discount, payment status |
 | `/receipts` | History — search, date & status filters (Paid / Partial / Pending / Void) |
 | `/receipts/[id]` | Receipt document — share via WhatsApp, email, PDF (print), copy link; duplicate or void |
 | `/customers` | Customer list with lifetime stats + detail drawer |
@@ -50,53 +51,78 @@ the app shell redirects to `/login` otherwise.
 
 ## Data layer
 
-There is no backend yet. All reads/writes go through `src/lib/api.ts`, a small
-async, REST-shaped mock API (260–420 ms simulated latency). Seed data lives in
-`src/lib/seed.ts` (12 sample receipts `ES-000203`–`ES-000214`).
+All reads and writes go through `src/lib/api.ts`, an HTTP client for the real
+Eleosstyles receipt API. There is **no localStorage mock and no seed data** —
+an empty account really is empty.
 
-Data is **partitioned per organization**:
+### Configuration
 
-| Key | Holds |
-| --- | --- |
-| `eleosstyles.accounts.v1` | Registered organizations (email + salted password hash) |
-| `eleosstyles.session.v1` | The currently signed-in session |
-| `eleosstyles.workspace.<orgId>` | That org's business profile, customers, and receipts |
-| `eleosstyles.receipt-system.v1` | Pre-auth data — claimed by the **first** account that signs up |
+The API origin lives in `.env` (git-ignored) with a committed template:
 
-The **first account created on a browser adopts the data already there**
-(renamed to the new organization's name); every later account starts with a
-clean, empty workspace. One org can never see another org's receipts.
-
-To start over, run this in the devtools console and reload:
-
-```js
-Object.keys(localStorage)
-  .filter((k) => k.startsWith("eleosstyles."))
-  .forEach((k) => localStorage.removeItem(k));
+```bash
+cp .env.example .env.local   # then adjust if the API moves
 ```
 
-Swapping in a real backend means replacing the internals of `src/lib/api.ts`
-(for auth, `src/lib/auth.ts`) — every screen already consumes promises through
-those two modules.
+```dotenv
+API_URL=https://receipt-backend-1-biue.onrender.com/api
+```
+
+`API_URL` is read by `next.config.ts`; the client-side code never sees it.
+
+### Why the `/api/*` proxy exists
+
+`next.config.ts` rewrites `/api/:path*` → `${API_URL}/:path*`:
+
+```ts
+async rewrites() {
+  return [{ source: "/api/:path*", destination: `${API_URL}/:path*` }];
+}
+```
+
+The API's session cookie `el_session` is **`SameSite=Lax`**, so a direct
+browser call from `localhost:3000` to `receipt-backend-1-biue.onrender.com`
+is cross-site: the cookie is sent on the first request but dropped on
+subsequent ones, so signup returns `201` and the very next `GET /auth/me`
+returns `401`. Proxying through Next keeps the request **same-origin**, so the
+browser attaches the cookie normally.
+
+Because of the rewrite, `src/lib/api.ts` calls **relative** paths
+(`/auth/me`, `/receipts`, …) with `credentials: "same-origin"` — it never
+builds an absolute URL. Signed logo URLs returned by the API (`/api/files/…`)
+resolve back through the same proxy.
+
+### What `src/lib/api.ts` does
+
+- `request()` — one `fetch` wrapper: JSON headers, same-origin credentials,
+  network-error handling, and throws an `ApiError` carrying `{message, code, details}`.
+- `Api*` types mirror the wire format; `toBusiness` / `toCustomer` / `toReceipt`
+  / `toSession` map them onto the UI's `src/lib/types.ts` types.
+- `resolveReceiptId()` — the API only addresses receipts by UUID, but the UI
+  routes use the human number (`ES-000001`), so reads search
+  `GET /receipts?search=` first and fall back to passing the number through.
+- `getReceipts()` pages client-side (`limit` is capped at 100 server-side).
+- Share links are **server-minted** (`GET /receipts/:id/share`); when a link
+  can't be fetched the QR block is omitted and Copy is disabled rather than
+  faking a URL.
 
 ### Auth
 
-`src/lib/auth.ts` implements register / login / logout / session against
-`localStorage`. Passwords are salted and hashed with an iterated SHA-256 via
-Web Crypto before storage, and the session only ever stores the org id, name,
-owner name, and email — never the password.
+`src/lib/api.ts` implements `signUp` / `signIn` / `signOut` / `getSession`
+against `POST /auth/signup`, `/auth/login`, `/auth/logout` and `GET /auth/me`.
+The API sets an **httpOnly** cookie, so there is nothing readable in the
+browser — `SessionProvider` resolves the session once on mount by calling
+`/auth/me` and maps a `401` to "unauthenticated".
 
-⚠️ This is a **UI prototype, not a security boundary**: everything still runs
-in the browser, so anyone with devtools access can read the stored data. A real
-deployment must move registration and login to a server and keep workspaces
-scoped by the authenticated user.
+Every other endpoint is tenant-scoped by that cookie: one organization can
+never see another's receipts, customers, or business record.
 
 ### Business rules
 
 - Receipts are **immutable after issue**: corrections are *void + reissue*.
   Voiding requires an audit note, and voided receipts stay in history struck through.
-- Receipt numbers use the `ES-000214` format; every receipt carries a QR code and a
-  short verification link.
+- Receipt numbers use the `ES-000214` format, allocated by the API; every issued
+  receipt carries a server-minted verification link (rendered as a QR code when
+  the link is available).
 - Payment status enum: `paid` / `partial` / `pending`. Receipt state: `active` / `void`.
   Payment methods: `cash` / `transfer` / `card` / `other`.
 - Brand colours set in Settings are used by the **receipt document only** (inline
@@ -106,6 +132,7 @@ scoped by the authenticated user.
 
 ```
 app/                  # routes only (layouts & pages)
+next.config.ts        # /api/* rewrite proxy to API_URL
 src/
   components/
     auth/             # session provider + login/signup screen
@@ -114,7 +141,7 @@ src/
     settings/         # settings form + template preview
     shell/            # top bar, sidebar, bottom nav, app shell (auth gate)
     ui/               # Button, Card, Field, StatusBadge, dialogs, …
-  lib/                # api, auth, seed, types, calc, format, share, …
+  lib/                # api (HTTP client), types, calc, format, share, …
 ```
 
 ## Printing / PDF

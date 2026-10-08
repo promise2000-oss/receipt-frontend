@@ -1,6 +1,5 @@
 import { QRCodeSVG } from "qrcode.react";
 import { formatDate, formatDateTime, formatMoney, formatQuantity } from "@/lib/format";
-import { receiptShareUrl } from "@/lib/share";
 import type { Business, Receipt } from "@/lib/types";
 import { cn } from "@/lib/cn";
 
@@ -11,6 +10,8 @@ const tint = (color: string, percent: number) =>
 interface ReceiptDocumentProps {
   receipt: Receipt;
   business: Business;
+  /** Public verification link — omit the QR block when it is unavailable. */
+  shareUrl?: string | null;
   className?: string;
 }
 
@@ -19,7 +20,12 @@ interface ReceiptDocumentProps {
  * brand header band, cream body, itemized table, gold total, QR verify.
  * Colours come from the business record so Settings pickers flow through.
  */
-export function ReceiptDocument({ receipt, business, className }: ReceiptDocumentProps) {
+export function ReceiptDocument({
+  receipt,
+  business,
+  shareUrl,
+  className,
+}: ReceiptDocumentProps) {
   const primary = business.brand_primary;
   const accent = business.brand_accent;
   const currency = business.currency;
@@ -213,14 +219,6 @@ export function ReceiptDocument({ receipt, business, className }: ReceiptDocumen
                 </dd>
               </div>
             )}
-            {receipt.tax > 0 && (
-              <div className="flex justify-between text-muted">
-                <dt>Tax</dt>
-                <dd className="tabular-nums text-ink">
-                  {formatMoney(receipt.tax, currency)}
-                </dd>
-              </div>
-            )}
             <div className="h-px w-full" style={{ backgroundColor: tint(accent, 40) }} />
             <div
               className="flex items-center justify-between rounded-[10px] px-4 py-3"
@@ -244,26 +242,28 @@ export function ReceiptDocument({ receipt, business, className }: ReceiptDocumen
 
         {/* Verification + notes */}
         <div className="mt-7 grid gap-5 sm:grid-cols-[auto_1fr] sm:items-start">
-          <div
-            className="inline-flex w-fit items-center gap-3 rounded-[10px] border bg-white p-3"
-            style={{ borderColor: tint(accent, 30) }}
-          >
-            <QRCodeSVG
-              value={receiptShareUrl(receipt)}
-              size={76}
-              bgColor="transparent"
-              fgColor={primary}
-              level="M"
-            />
-            <div className="max-w-[190px]">
-              <div className="text-[10px] font-medium uppercase tracking-[0.2em] text-muted">
-                Verify Receipt
-              </div>
-              <div className="mt-1 break-all text-[11px] leading-snug text-ink">
-                {receiptShareUrl(receipt)}
+          {shareUrl ? (
+            <div
+              className="inline-flex w-fit items-center gap-3 rounded-[10px] border bg-white p-3"
+              style={{ borderColor: tint(accent, 30) }}
+            >
+              <QRCodeSVG
+                value={shareUrl}
+                size={76}
+                bgColor="transparent"
+                fgColor={primary}
+                level="M"
+              />
+              <div className="max-w-[190px]">
+                <div className="text-[10px] font-medium uppercase tracking-[0.2em] text-muted">
+                  Verify Receipt
+                </div>
+                <div className="mt-1 break-all text-[11px] leading-snug text-ink">
+                  {shareUrl}
+                </div>
               </div>
             </div>
-          </div>
+          ) : null}
 
           {receipt.notes && (
             <div

@@ -23,27 +23,62 @@ export function ReceiptPreview({ id }: { id: string }) {
   /** undefined = loading · null = not found */
   const [receipt, setReceipt] = useState<Receipt | null | undefined>(undefined);
   const [business, setBusiness] = useState<Business | null>(null);
+  /** undefined = loading · null = no public link for this receipt */
+  const [shareUrl, setShareUrl] = useState<string | null | undefined>(undefined);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const [voidOpen, setVoidOpen] = useState(false);
   const [voidNote, setVoidNote] = useState("");
   const [voidBusy, setVoidBusy] = useState(false);
   const [noteTouched, setNoteTouched] = useState(false);
+  const [voidError, setVoidError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
-    Promise.all([api.getReceipt(id), api.getBusiness()]).then(
-      ([found, profile]) => {
+    (async () => {
+      try {
+        const [found, profile] = await Promise.all([
+          api.getReceipt(id),
+          api.getBusiness(),
+        ]);
+        if (cancelled) return;
+        // Public links are minted per receipt; if this fails we only lose the QR.
+        const url = found ? await api.getShareLink(found.id).catch(() => null) : null;
         if (cancelled) return;
         setReceipt(found);
         setBusiness(profile);
-      },
-    );
+        setShareUrl(url);
+      } catch (caught) {
+        if (cancelled) return;
+        setLoadError(
+          caught instanceof Error
+            ? caught.message
+            : "Something went wrong while loading this receipt.",
+        );
+      }
+    })();
     return () => {
       cancelled = true;
     };
   }, [id]);
 
-  if (receipt === undefined || !business) return <ReceiptPreviewSkeleton />;
+  if (loadError) {
+    return (
+      <EmptyState
+        title="Couldn't load this receipt"
+        description={loadError}
+        action={
+          <ButtonLink href="/receipts" variant="outline">
+            <ArrowLeft className="h-4 w-4" />
+            Back to receipts
+          </ButtonLink>
+        }
+      />
+    );
+  }
+
+  if (receipt === undefined || !business || shareUrl === undefined)
+    return <ReceiptPreviewSkeleton />;
 
   if (receipt === null) {
     return (
@@ -67,13 +102,23 @@ export function ReceiptPreview({ id }: { id: string }) {
     setNoteTouched(true);
     if (noteTooShort || voidBusy) return;
     setVoidBusy(true);
-    const updated = await api.voidReceipt(receipt!.id, voidNote.trim());
-    setVoidBusy(false);
-    if (updated) {
-      setReceipt(updated);
-      setVoidOpen(false);
-      setVoidNote("");
-      setNoteTouched(false);
+    setVoidError(null);
+    try {
+      const updated = await api.voidReceipt(receipt!.id, voidNote.trim());
+      if (updated) {
+        setReceipt(updated);
+        setVoidOpen(false);
+        setVoidNote("");
+        setNoteTouched(false);
+      } else {
+        setVoidError("That receipt is already voided, or it no longer exists.");
+      }
+    } catch (caught) {
+      setVoidError(
+        caught instanceof Error ? caught.message : "Couldn't void this receipt.",
+      );
+    } finally {
+      setVoidBusy(false);
     }
   }
 
@@ -139,9 +184,17 @@ export function ReceiptPreview({ id }: { id: string }) {
 
       {/* ---- The document + share row ---- */}
       <div className="mx-auto w-full max-w-3xl">
-        <ReceiptDocument receipt={receipt} business={business} />
+        <ReceiptDocument
+          receipt={receipt}
+          business={business}
+          shareUrl={shareUrl}
+        />
         <div className="mt-5">
-          <ShareBar receipt={receipt} business={business} />
+          <ShareBar
+            receipt={receipt}
+            business={business}
+            shareUrl={shareUrl}
+          />
         </div>
       </div>
 
@@ -157,6 +210,7 @@ export function ReceiptPreview({ id }: { id: string }) {
           if (!voidBusy) {
             setVoidOpen(false);
             setNoteTouched(false);
+            setVoidError(null);
           }
         }}
       >
@@ -171,6 +225,11 @@ export function ReceiptPreview({ id }: { id: string }) {
             className="min-h-20"
           />
         </label>
+        {voidError && (
+          <p className="mt-2 rounded-control border border-brand-gold/30 bg-brand-gold/10 px-3 py-2 text-xs text-gold-deep">
+            {voidError}
+          </p>
+        )}
         {noteTouched && noteTooShort && (
           <p className="mt-1.5 text-xs text-gold-deep">
             Add a short audit note (at least a few words).

@@ -8,18 +8,6 @@ export type ReceiptStatus = "active" | "void";
 
 /* ------------------------------ Accounts ------------------------------ */
 
-/** An organization account — every workspace belongs to exactly one. */
-export interface Account {
-  id: string;
-  org_name: string;
-  owner_name: string;
-  /** Lowercased, unique across accounts. */
-  email: string;
-  /** `${salt}:${digest}` — see `hashPassword` (prototype-only, not real security). */
-  password: string;
-  created_at: string;
-}
-
 /** What the app needs about the signed-in account. Never carries the password. */
 export interface SessionInfo {
   account_id: string;
@@ -38,13 +26,6 @@ export interface SignUpInput {
 export interface SignInInput {
   email: string;
   password: string;
-}
-
-/** One organization's private data: profile, customers, receipts. */
-export interface Workspace {
-  business: Business;
-  customers: Customer[];
-  receipts: Receipt[];
 }
 
 export interface Business {
@@ -91,7 +72,6 @@ export interface Receipt {
   items: ReceiptItem[];
   subtotal: number;
   discount: number;
-  tax: number;
   total: number;
   payment_method: PaymentMethod;
   payment_status: PaymentStatus;
@@ -117,7 +97,6 @@ export interface ReceiptInput {
     unit_price: number;
   }>;
   discount: number;
-  tax_rate: number;
   payment_method: PaymentMethod;
   payment_status: PaymentStatus;
   notes?: string;

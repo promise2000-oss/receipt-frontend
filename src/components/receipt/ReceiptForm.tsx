@@ -80,7 +80,6 @@ export function ReceiptForm({ duplicateOf, prefillCustomerId }: ReceiptFormProps
 
   const [rows, setRows] = useState<ItemRow[]>([newRow("row-0")]);
   const [discount, setDiscount] = useState("");
-  const [taxRate, setTaxRate] = useState("");
   const [method, setMethod] = useState<PaymentMethod>("transfer");
   const [status, setStatus] = useState<PaymentStatus>("paid");
   const [notes, setNotes] = useState("");
@@ -127,10 +126,6 @@ export function ReceiptForm({ duplicateOf, prefillCustomerId }: ReceiptFormProps
             })),
           );
           setDiscount(receipt.discount > 0 ? String(receipt.discount) : "");
-          const taxable = receipt.subtotal - receipt.discount;
-          const rate =
-            taxable > 0 && receipt.tax > 0 ? (receipt.tax / taxable) * 100 : 0;
-          setTaxRate(rate > 0 ? String(Number(rate.toFixed(2))) : "");
           setMethod(receipt.payment_method);
           setStatus(receipt.payment_status);
           setNotes(receipt.notes ?? "");
@@ -161,11 +156,7 @@ export function ReceiptForm({ duplicateOf, prefillCustomerId }: ReceiptFormProps
       unit_price: Number(row.unitPrice) || 0,
     }));
 
-  const totals = computeTotals(
-    parsedItems,
-    Number(discount) || 0,
-    Number(taxRate) || 0,
-  );
+  const totals = computeTotals(parsedItems, Number(discount) || 0);
 
   const itemsValid =
     parsedItems.length > 0 &&
@@ -219,7 +210,6 @@ export function ReceiptForm({ duplicateOf, prefillCustomerId }: ReceiptFormProps
         },
         items: parsedItems,
         discount: Number(discount) || 0,
-        tax_rate: Number(taxRate) || 0,
         payment_method: method,
         payment_status: status,
         notes,
@@ -500,50 +490,30 @@ export function ReceiptForm({ duplicateOf, prefillCustomerId }: ReceiptFormProps
               </CardBody>
             </Card>
 
-            {/* ---- Discount & Tax ---- */}
+            {/* ---- Discount ---- */}
             <Card>
               <CardHeader
-                title="Discount & Tax"
-                description="Both are optional — leave blank for none."
+                title="Discount"
+                description="Optional — leave blank for none."
               />
               <CardBody>
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <Field label="Discount" hint="Amount off the subtotal">
-                    <div className="relative">
-                      <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted">
-                        {currency === "NGN" ? "₦" : currency}
-                      </span>
-                      <TextInput
-                        value={discount}
-                        onChange={(event) => setDiscount(event.target.value)}
-                        type="number"
-                        min={0}
-                        step="0.01"
-                        inputMode="decimal"
-                        placeholder="0"
-                        className="pl-8"
-                      />
-                    </div>
-                  </Field>
-                  <Field label="Tax rate" hint="Applied after the discount">
-                    <div className="relative">
-                      <TextInput
-                        value={taxRate}
-                        onChange={(event) => setTaxRate(event.target.value)}
-                        type="number"
-                        min={0}
-                        max={100}
-                        step="0.01"
-                        inputMode="decimal"
-                        placeholder="0"
-                        className="pr-9"
-                      />
-                      <span className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 text-sm text-muted">
-                        %
-                      </span>
-                    </div>
-                  </Field>
-                </div>
+                <Field label="Discount" hint="Amount off the subtotal">
+                  <div className="relative">
+                    <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted">
+                      {currency === "NGN" ? "₦" : currency}
+                    </span>
+                    <TextInput
+                      value={discount}
+                      onChange={(event) => setDiscount(event.target.value)}
+                      type="number"
+                      min={0}
+                      step="0.01"
+                      inputMode="decimal"
+                      placeholder="0"
+                      className="pl-8"
+                    />
+                  </div>
+                </Field>
               </CardBody>
             </Card>
 
@@ -614,12 +584,6 @@ export function ReceiptForm({ duplicateOf, prefillCustomerId }: ReceiptFormProps
                       <dd className="tabular-nums text-ink">
                         {totals.discount > 0 ? "− " : ""}
                         {formatMoney(totals.discount, currency)}
-                      </dd>
-                    </div>
-                    <div className="flex justify-between text-muted">
-                      <dt>Tax {Number(taxRate) > 0 ? `(${Number(taxRate)}%)` : ""}</dt>
-                      <dd className="tabular-nums text-ink">
-                        {formatMoney(totals.tax, currency)}
                       </dd>
                     </div>
                   </dl>
