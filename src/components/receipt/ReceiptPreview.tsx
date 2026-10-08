@@ -110,7 +110,7 @@ export function ReceiptPreview({ id }: { id: string }) {
       </div>
 
       {/* ---- Title ---- */}
-      <div className="mb-5">
+      <div className="no-print mb-5">
         <h1 className="text-2xl font-semibold tracking-tight text-ink">
           Receipt {receipt.receipt_number}
         </h1>

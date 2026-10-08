@@ -5,6 +5,7 @@ import { CalendarDays, CalendarRange, Plus, Sun } from "lucide-react";
 import { api } from "@/lib/api";
 import { formatLongDate, formatMoney } from "@/lib/format";
 import type { DashboardSummary } from "@/lib/types";
+import { useSession } from "@/components/auth/SessionProvider";
 import { ButtonLink } from "@/components/ui/Button";
 import { Card, CardHeader } from "@/components/ui/Card";
 import { PageHeader } from "@/components/ui/PageHeader";
@@ -25,6 +26,7 @@ const STAT_BLOCKS: Array<{
 export default function DashboardPage() {
   const [summary, setSummary] = useState<DashboardSummary | null>(null);
   const [todayLabel, setTodayLabel] = useState<string | null>(null);
+  const { session } = useSession();
 
   useEffect(() => {
     let cancelled = false;
@@ -38,13 +40,15 @@ export default function DashboardPage() {
     };
   }, []);
 
+  const heading = todayLabel
+    ? `${todayLabel} · ${session?.org_name ?? ""}`.trim()
+    : "A quick look at your sales.";
+
   return (
     <>
       <PageHeader
         title="Dashboard"
-        description={
-          todayLabel ? `${todayLabel} · Eleosstyles` : "A quick look at your sales."
-        }
+        description={heading}
         actions={
           <ButtonLink href="/receipts/new">
             <Plus className="h-4 w-4" strokeWidth={2.5} />

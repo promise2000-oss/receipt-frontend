@@ -6,6 +6,47 @@ export type PaymentMethod = "cash" | "transfer" | "card" | "other";
 export type PaymentStatus = "paid" | "partial" | "pending";
 export type ReceiptStatus = "active" | "void";
 
+/* ------------------------------ Accounts ------------------------------ */
+
+/** An organization account — every workspace belongs to exactly one. */
+export interface Account {
+  id: string;
+  org_name: string;
+  owner_name: string;
+  /** Lowercased, unique across accounts. */
+  email: string;
+  /** `${salt}:${digest}` — see `hashPassword` (prototype-only, not real security). */
+  password: string;
+  created_at: string;
+}
+
+/** What the app needs about the signed-in account. Never carries the password. */
+export interface SessionInfo {
+  account_id: string;
+  org_name: string;
+  owner_name: string;
+  email: string;
+}
+
+export interface SignUpInput {
+  org_name: string;
+  owner_name: string;
+  email: string;
+  password: string;
+}
+
+export interface SignInInput {
+  email: string;
+  password: string;
+}
+
+/** One organization's private data: profile, customers, receipts. */
+export interface Workspace {
+  business: Business;
+  customers: Customer[];
+  receipts: Receipt[];
+}
+
 export interface Business {
   id: string;
   name: string;

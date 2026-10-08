@@ -1,5 +1,6 @@
 import { computeTotals, round2 } from "./calc";
 import { createSeedState } from "./seed";
+import * as auth from "./auth";
 import type {
   Business,
   Customer,
@@ -7,12 +8,20 @@ import type {
   Receipt,
   ReceiptFilters,
   ReceiptInput,
+  SessionInfo,
+  SignInInput,
+  SignUpInput,
+  Workspace,
 } from "./types";
 
 /**
  * API-shaped mock client — mirrors the TRD §3.1 endpoints so the UI can
  * later swap this module for real REST calls without component changes.
  *
+ *   POST   /auth/register    -> signUp()
+ *   POST   /auth/login       -> signIn()
+ *   POST   /auth/logout      -> signOut()
+ *   GET    /auth/session     -> getSession()
  *   GET    /business/me        -> getBusiness()
  *   PATCH  /business/me        -> updateBusiness()
  *   GET    /customers          -> getCustomers()
@@ -22,47 +31,146 @@ import type {
  *   POST   /receipts           -> createReceipt()
  *   PATCH  /receipts/:id/void  -> voidReceipt()
  *   GET    /dashboard/summary  -> getDashboardSummary()
+ *
+ * Data is partitioned per organization: each account owns a workspace stored
+ * under its own localStorage key, so one signed-in org never sees another
+ * org's customers or receipts.
  */
 
-const STORAGE_KEY = "eleosstyles.receipt-system.v1";
+/** Workspace written by builds before org accounts existed. */
+const LEGACY_KEY = "eleosstyles.receipt-system.v1";
 const LATENCY_MS = 260;
 
-interface State {
-  business: Business;
-  customers: Customer[];
-  receipts: Receipt[];
-}
-
-let memoryState: State | null = null;
+const workspaceKey = (accountId: string) =>
+  `eleosstyles.workspace.${accountId}`;
 
 const hasWindow = () => typeof window !== "undefined";
 
-function persist(state: State): void {
+/** Cached workspace for the *current* session only. */
+let memoryState: Workspace | null = null;
+let memoryAccountId: string | null = null;
+
+/* ------------------------------- Storage ------------------------------- */
+
+function persist(state: Workspace): void {
   memoryState = state;
-  if (!hasWindow()) return;
+  const accountId = auth.getSession()?.account_id;
+  if (!hasWindow() || !accountId) return;
   try {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    window.localStorage.setItem(workspaceKey(accountId), JSON.stringify(state));
   } catch {
     /* storage unavailable — in-memory only */
   }
 }
 
-function loadState(): State {
-  if (memoryState) return memoryState;
-  if (hasWindow()) {
+function readRaw(key: string): string | null {
+  if (!hasWindow()) return null;
+  try {
+    return window.localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+
+function writeRaw(key: string, value: string): void {
+  if (!hasWindow()) return;
+  try {
+    window.localStorage.setItem(key, value);
+  } catch {
+    /* ignore */
+  }
+}
+
+function removeRaw(key: string): void {
+  if (!hasWindow()) return;
+  try {
+    window.localStorage.removeItem(key);
+  } catch {
+    /* ignore */
+  }
+}
+
+/** Fresh, unbranded workspace for a brand-new organization. */
+function emptyWorkspace(session: SessionInfo): Workspace {
+  return {
+    business: {
+      id: `b_${crypto.randomUUID().slice(0, 8)}`,
+      name: session.org_name,
+      logo_url: null,
+      address: "",
+      phone: "",
+      email: session.email,
+      currency: "NGN",
+      brand_primary: "#111111",
+      brand_accent: "#B8912F",
+      created_at: new Date().toISOString(),
+    },
+    customers: [],
+    receipts: [],
+  };
+}
+
+/**
+ * The signed-in org's workspace. On a miss it claims whatever was already on
+ * this browser (pre-account data, or the demo seed on a fresh install) and
+ * re-badges it with the new organization's name.
+ */
+function loadState(): Workspace {
+  const accountId = auth.getSession()?.account_id;
+
+  // Signed out: hand back an empty shell — the shell gate redirects away.
+  if (!accountId) {
+    if (!memoryState) memoryState = emptyWorkspace(placeholderSession());
+    return memoryState;
+  }
+
+  if (memoryState && memoryAccountId === accountId) return memoryState;
+
+  const stored = readRaw(workspaceKey(accountId));
+  if (stored) {
     try {
-      const raw = window.localStorage.getItem(STORAGE_KEY);
-      if (raw) {
-        memoryState = JSON.parse(raw) as State;
-        return memoryState;
-      }
+      memoryState = JSON.parse(stored) as Workspace;
+      memoryAccountId = accountId;
+      return memoryState;
     } catch {
-      /* fall through to seed */
+      /* fall through and re-provision */
     }
   }
-  memoryState = createSeedState();
-  persist(memoryState);
-  return memoryState;
+
+  const session = auth.getSession()!;
+  const legacy = readRaw(LEGACY_KEY);
+  let state: Workspace;
+
+  if (legacy) {
+    try {
+      state = JSON.parse(legacy) as Workspace;
+      state.business = { ...state.business, name: session.org_name };
+      removeRaw(LEGACY_KEY);
+    } catch {
+      state = emptyWorkspace(session);
+    }
+  } else {
+    state = emptyWorkspace(session);
+  }
+
+  persist(state);
+  memoryAccountId = accountId;
+  return state;
+}
+
+function placeholderSession(): SessionInfo {
+  return {
+    account_id: "",
+    org_name: "",
+    owner_name: "",
+    email: "",
+  };
+}
+
+/** Forget the cached workspace — called whenever the session changes. */
+function resetState(): void {
+  memoryState = null;
+  memoryAccountId = null;
 }
 
 const wait = (ms: number = LATENCY_MS) =>
@@ -101,6 +209,57 @@ function within(iso: string, since: Date): boolean {
 }
 
 export const api = {
+  /* ------------------------------ Accounts ------------------------------ */
+
+  /**
+   * Register an organization. The first account created on this browser
+   * adopts the workspace already present here (your data, or the demo seed
+   * on a fresh install); every later account starts with a clean workspace.
+   */
+  async signUp(input: SignUpInput): Promise<SessionInfo> {
+    const isFirstAccount = !auth.hasAnyAccount();
+    const session = await auth.signUp(input);
+    resetState();
+
+    if (isFirstAccount) {
+      // Adopt whatever is on this browser under the new account's key.
+      const legacy = readRaw(LEGACY_KEY);
+      if (legacy) {
+        writeRaw(workspaceKey(session.account_id), legacy);
+        removeRaw(LEGACY_KEY);
+      } else if (!readRaw(workspaceKey(session.account_id))) {
+        writeRaw(
+          workspaceKey(session.account_id),
+          JSON.stringify(createSeedState()),
+        );
+      }
+    }
+
+    const state = loadState();
+    // Claimed data keeps its receipts but is re-badged with the new org name.
+    if (state.business.name !== session.org_name) {
+      persist({ ...state, business: { ...state.business, name: session.org_name } });
+    }
+
+    return session;
+  },
+
+  async signIn(input: SignInInput): Promise<SessionInfo> {
+    const session = await auth.signIn(input);
+    resetState();
+    loadState();
+    return session;
+  },
+
+  signOut(): void {
+    auth.signOut();
+    resetState();
+  },
+
+  getSession(): SessionInfo | null {
+    return auth.getSession();
+  },
+
   /* ---------------- Business ---------------- */
 
   async getBusiness(): Promise<Business> {
@@ -194,6 +353,7 @@ export const api = {
   async createReceipt(input: ReceiptInput): Promise<Receipt> {
     await wait(420);
     const state = loadState();
+    const accountId = auth.getSession()?.account_id ?? "";
 
     // Resolve an existing customer (by id, phone, or name) or create one.
     const normalise = (value: string | undefined) => (value ?? "").replace(/\s+/g, "").toLowerCase();
@@ -246,7 +406,7 @@ export const api = {
       void_note: null,
       voided_at: null,
       notes: input.notes?.trim() || null,
-      created_by: "u_01_owner",
+      created_by: accountId,
       created_at: now,
     };
 

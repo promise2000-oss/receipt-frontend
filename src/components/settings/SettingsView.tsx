@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Check, ImageUp, RotateCcw } from "lucide-react";
+import { Check, ImageUp, LogOut, RotateCcw } from "lucide-react";
 import { api } from "@/lib/api";
+import { useSession } from "@/components/auth/SessionProvider";
 import { readImageAsDataUrl } from "@/lib/image";
 import { formatMoney } from "@/lib/format";
 import type { Business } from "@/lib/types";
@@ -87,11 +88,13 @@ function ColorField({
 
 function TemplatePreview({
   businessName,
+  logo,
   primary,
   accent,
   currency,
 }: {
   businessName: string;
+  logo: string | null;
   primary: string;
   accent: string;
   currency: string;
@@ -110,8 +113,18 @@ function TemplatePreview({
         className="flex items-center justify-between px-5 py-4"
         style={{ backgroundColor: p }}
       >
-        <span className="font-display text-[13px] uppercase tracking-[0.2em] text-white">
-          {businessName || "Your Business"}
+        <span className="flex min-w-0 items-center gap-2.5">
+          {logo ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={logo}
+              alt=""
+              className="h-6 w-6 shrink-0 rounded-[6px] bg-white object-contain p-0.5"
+            />
+          ) : null}
+          <span className="truncate font-display text-[13px] uppercase tracking-[0.2em] text-white">
+            {businessName || "Your Business"}
+          </span>
         </span>
         <span
           className="text-[9.5px] font-semibold uppercase tracking-[0.28em]"
@@ -156,6 +169,7 @@ export function SettingsView() {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { session, signOut } = useSession();
 
   const [name, setName] = useState("");
   const [address, setAddress] = useState("");
@@ -163,6 +177,9 @@ export function SettingsView() {
   const [email, setEmail] = useState("");
   const [currency, setCurrency] = useState("NGN");
   const [logo, setLogo] = useState<string | null>(null);
+  const [logoStatus, setLogoStatus] = useState<"idle" | "saving" | "saved" | "error">(
+    "idle",
+  );
   const [primary, setPrimary] = useState(DEFAULT_PRIMARY);
   const [accent, setAccent] = useState(DEFAULT_ACCENT);
 
@@ -196,6 +213,30 @@ export function SettingsView() {
     setError(null);
     const dataUrl = await readImageAsDataUrl(file, 320);
     setLogo(dataUrl);
+
+    // Save immediately — the whole point is that the next receipt (and its
+    // print/PDF) picks the logo up without a second click.
+    setLogoStatus("saving");
+    try {
+      await api.updateBusiness({ logo_url: dataUrl });
+      setLogoStatus("saved");
+      setTimeout(() => setLogoStatus("idle"), 2600);
+    } catch {
+      setLogoStatus("error");
+      setError("Couldn't save the logo — press “Save changes” to retry.");
+    }
+  }
+
+  async function onRemoveLogo() {
+    setLogo(null);
+    setLogoStatus("saving");
+    try {
+      await api.updateBusiness({ logo_url: null });
+      setLogoStatus("idle");
+    } catch {
+      setLogoStatus("error");
+      setError("Couldn't remove the logo — press “Save changes” to retry.");
+    }
   }
 
   async function save() {
@@ -339,15 +380,27 @@ export function SettingsView() {
                   />
                   <Button variant="outline" onClick={() => fileRef.current?.click()}>
                     <ImageUp className="h-4 w-4" strokeWidth={1.9} />
-                    Upload logo
+                    {logoStatus === "saving" ? "Saving…" : "Upload logo"}
                   </Button>
                   {logo && (
-                    <Button variant="ghost" onClick={() => setLogo(null)}>
+                    <Button variant="ghost" onClick={onRemoveLogo}>
                       Remove
                     </Button>
                   )}
                   <p className="pt-1 text-xs text-muted">
                     PNG or JPG · recommended square, at least 256×256.
+                  </p>
+                  <p
+                    className={cn(
+                      "pt-0.5 text-xs",
+                      logoStatus === "error" ? "text-gold-deep" : "text-brand-gold",
+                    )}
+                    role="status"
+                  >
+                    {logoStatus === "saving" && "Saving logo…"}
+                    {logoStatus === "saved" &&
+                      "Saved — it's on your next receipt and printout."}
+                    {logoStatus === "error" && "Not saved yet."}
                   </p>
                 </div>
               </div>
@@ -387,10 +440,33 @@ export function SettingsView() {
           <CardBody>
             <TemplatePreview
               businessName={name}
+              logo={logo}
               primary={primary}
               accent={accent}
               currency={currency}
             />
+          </CardBody>
+        </Card>
+
+        {/* ---- Account ---- */}
+        <Card>
+          <CardHeader
+            title="Organization Account"
+            description="This workspace, its receipts, and its customers belong to this account only."
+          />
+          <CardBody className="flex flex-wrap items-center justify-between gap-4">
+            <div className="min-w-0">
+              <p className="text-[15px] font-medium text-ink">
+                {session?.org_name}
+              </p>
+              <p className="mt-1 text-sm text-muted">
+                {session?.owner_name} · {session?.email}
+              </p>
+            </div>
+            <Button variant="outline" onClick={signOut}>
+              <LogOut className="h-4 w-4" strokeWidth={1.9} />
+              Sign out
+            </Button>
           </CardBody>
         </Card>
 

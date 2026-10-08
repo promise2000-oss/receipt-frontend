@@ -27,12 +27,17 @@ npm run lint    # ESLint
 
 | Route | What it does |
 | --- | --- |
+| `/signup` | Create an organization — org name, your name, email, password |
+| `/login` | Sign in to an existing organization |
 | `/` | Dashboard — today / week / month totals + recent receipts |
 | `/receipts/new` | Issue a receipt — customer picker, live line totals, discount & tax, payment status |
 | `/receipts` | History — search, date & status filters (Paid / Partial / Pending / Void) |
 | `/receipts/[id]` | Receipt document — share via WhatsApp, email, PDF (print), copy link; duplicate or void |
 | `/customers` | Customer list with lifetime stats + detail drawer |
-| `/settings` | Business details, logo, brand colours with a live template preview |
+| `/settings` | Business details, logo (auto-saves), brand colours with a live template preview, account |
+
+Every route except `/login` and `/signup` requires a signed-in organization —
+the app shell redirects to `/login` otherwise.
 
 ## Design system
 
@@ -46,15 +51,45 @@ npm run lint    # ESLint
 ## Data layer
 
 There is no backend yet. All reads/writes go through `src/lib/api.ts`, a small
-async, REST-shaped mock API (260–420 ms simulated latency) persisted to
-`localStorage` under `eleosstyles.receipt-system.v1`. Seed data lives in
+async, REST-shaped mock API (260–420 ms simulated latency). Seed data lives in
 `src/lib/seed.ts` (12 sample receipts `ES-000203`–`ES-000214`).
 
-To start over from seed data, clear the key in devtools or run
-`localStorage.removeItem('eleosstyles.receipt-system.v1')` in the console and reload.
+Data is **partitioned per organization**:
 
-Swapping in a real backend means replacing the internals of `src/lib/api.ts` —
-every screen already consumes promises through that one module.
+| Key | Holds |
+| --- | --- |
+| `eleosstyles.accounts.v1` | Registered organizations (email + salted password hash) |
+| `eleosstyles.session.v1` | The currently signed-in session |
+| `eleosstyles.workspace.<orgId>` | That org's business profile, customers, and receipts |
+| `eleosstyles.receipt-system.v1` | Pre-auth data — claimed by the **first** account that signs up |
+
+The **first account created on a browser adopts the data already there**
+(renamed to the new organization's name); every later account starts with a
+clean, empty workspace. One org can never see another org's receipts.
+
+To start over, run this in the devtools console and reload:
+
+```js
+Object.keys(localStorage)
+  .filter((k) => k.startsWith("eleosstyles."))
+  .forEach((k) => localStorage.removeItem(k));
+```
+
+Swapping in a real backend means replacing the internals of `src/lib/api.ts`
+(for auth, `src/lib/auth.ts`) — every screen already consumes promises through
+those two modules.
+
+### Auth
+
+`src/lib/auth.ts` implements register / login / logout / session against
+`localStorage`. Passwords are salted and hashed with an iterated SHA-256 via
+Web Crypto before storage, and the session only ever stores the org id, name,
+owner name, and email — never the password.
+
+⚠️ This is a **UI prototype, not a security boundary**: everything still runs
+in the browser, so anyone with devtools access can read the stored data. A real
+deployment must move registration and login to a server and keep workspaces
+scoped by the authenticated user.
 
 ### Business rules
 
@@ -73,16 +108,28 @@ every screen already consumes promises through that one module.
 app/                  # routes only (layouts & pages)
 src/
   components/
+    auth/             # session provider + login/signup screen
     receipt/          # form, document, preview, history view
     customers/        # list + drawer
     settings/         # settings form + template preview
-    shell/            # top bar, sidebar, bottom nav, app shell
+    shell/            # top bar, sidebar, bottom nav, app shell (auth gate)
     ui/               # Button, Card, Field, StatusBadge, dialogs, …
-  lib/                # api, seed, types, calc, format, share, …
+  lib/                # api, auth, seed, types, calc, format, share, …
 ```
 
 ## Printing / PDF
 
 **Download PDF** on a receipt opens the browser print dialog. Print styles in
-`app/globals.css` hide all app chrome and render only the receipt document —
-use "Save as PDF" in the print dialog.
+`app/globals.css` hide all app chrome (top bar, sidebar, page title, share
+buttons) and render only the receipt document — use "Save as PDF" in the print
+dialog.
+
+The receipt sets `print-color-adjust: exact`, so the black header band, gold
+total, and uploaded logo print even when the browser's "Background graphics"
+option is off.
+
+### Logo
+
+**Upload logo** in Settings saves immediately — no "Save changes" click needed.
+The logo is stored on the business record and flows into the receipt header,
+the live template preview, and the print/PDF output automatically.
