@@ -1,7 +1,7 @@
 @import "tailwindcss";
 
 /* ============================================================
-   Eleosstyles — design tokens (Tailwind v4 CSS-first theme)
+   Receipt platform — design tokens (Tailwind v4 CSS-first theme)
    Cream / Black / Gold only. Flat, minimal, no heavy shadows.
    ============================================================ */
 @theme inline {
@@ -100,7 +100,16 @@ input[type="color"]::-webkit-color-swatch {
   border-radius: 8px;
 }
 
-/* ---- Print: receipt preview prints as the PDF ---- */
+/* ---- Print: the paper copy is a monochrome, printer-friendly document ----
+   The on-screen receipt (and the API's exported PDF) carries the full brand
+   treatment. A physical receipt is a different medium: ink costs money, most
+   office printers are monochrome anyway, and a pale brand colour behind dark
+   text is exactly what turns illegible when the background is dropped.
+
+   So the bands become rules, the tinted strips become white, and every piece
+   of text goes to black — with one deliberate exception: the organization's
+   logo keeps its own colours, which §14 explicitly allows, so a customer can
+   still recognize the issuer at a glance. */
 @media print {
   body {
     background: #ffffff;
@@ -114,15 +123,53 @@ input[type="color"]::-webkit-color-swatch {
     box-shadow: none !important;
     max-width: none !important;
     margin: 0 !important;
-    /* Printers drop backgrounds by default — without this the black header
-       band (and the white business name on it) disappears from the PDF. */
+    background: #ffffff !important;
+    color: #111111 !important;
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
   }
-  /* Brand colours on the receipt: header band, table head, gold total. */
-  .receipt-document * {
+  /* The QR is already black on white — pin it so nothing tints it later. */
+  .receipt-document .doc-qr,
+  .receipt-document .doc-qr * {
+    background: #ffffff !important;
+    color: #111111 !important;
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
+  }
+  .receipt-document .doc-band,
+  .receipt-document .doc-band * {
+    background: transparent !important;
+    color: #111111 !important;
+  }
+  .receipt-document .doc-band {
+    border-bottom: 2px solid #111111 !important;
+    padding-top: 0 !important;
+  }
+  .receipt-document .doc-meta {
+    background: #ffffff !important;
+    border-bottom: 1px solid #999999 !important;
+  }
+  .receipt-document .doc-meta * {
+    color: #111111 !important;
+  }
+  .receipt-document .doc-table-head {
+    background: #ffffff !important;
+    border-bottom: 2px solid #111111 !important;
+  }
+  .receipt-document .doc-table-head * {
+    color: #111111 !important;
+  }
+  .receipt-document .doc-total {
+    background: #ffffff !important;
+    border: 2px solid #111111 !important;
+    color: #111111 !important;
+  }
+  .receipt-document .doc-total * {
+    color: #111111 !important;
+  }
+  /* Rules, dividers and tints all flatten to hairlines. */
+  .receipt-document .doc-footer {
+    border-top-color: #111111 !important;
   }
   main {
     padding: 0 !important;

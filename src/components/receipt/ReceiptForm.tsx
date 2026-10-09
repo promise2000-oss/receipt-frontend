@@ -19,6 +19,7 @@ import type {
   PaymentMethod,
   PaymentStatus,
 } from "@/lib/types";
+import { useSession } from "@/components/auth/SessionProvider";
 import { Button } from "@/components/ui/Button";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
 import { Field, TextArea, TextInput } from "@/components/ui/Field";
@@ -65,7 +66,8 @@ export function ReceiptForm({ duplicateOf, prefillCustomerId }: ReceiptFormProps
   const router = useRouter();
 
   const [customers, setCustomers] = useState<Customer[]>([]);
-  const [currency, setCurrency] = useState("NGN");
+  /** The organization's currency — already on the session, no second call. */
+  const currency = useSession().session?.business.currency ?? "NGN";
 
   const [selected, setSelected] = useState<{
     id?: string;
@@ -93,13 +95,9 @@ export function ReceiptForm({ duplicateOf, prefillCustomerId }: ReceiptFormProps
     let cancelled = false;
 
     (async () => {
-      const [customerList, business] = await Promise.all([
-        api.getCustomers(),
-        api.getBusiness(),
-      ]);
+      const customerList = await api.getCustomers();
       if (cancelled) return;
       setCustomers(customerList);
-      setCurrency(business.currency);
 
       if (prefillCustomerId) {
         const match = customerList.find((item) => item.id === prefillCustomerId);

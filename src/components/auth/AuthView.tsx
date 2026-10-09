@@ -86,7 +86,7 @@ export function AuthView({ mode }: { mode: Mode }) {
 
         <div className="py-14">
           <p className="text-[10.5px] font-medium uppercase tracking-[0.28em] text-brand-gold">
-            Receipt System
+            Receipt Platform
           </p>
           <h2 className="mt-4 max-w-md font-display text-3xl leading-tight text-cream sm:text-4xl">
             Beautiful branded receipts, issued in under a minute.
@@ -99,7 +99,7 @@ export function AuthView({ mode }: { mode: Mode }) {
         </div>
 
         <p className="text-xs text-cream/40">
-          {new Date().getFullYear()} Eleosstyles · Receipt System
+          {new Date().getFullYear()} Powered by VisionaryGene
         </p>
       </div>
 
@@ -120,7 +120,7 @@ export function AuthView({ mode }: { mode: Mode }) {
                   <TextInput
                     value={orgName}
                     onChange={(event) => setOrgName(event.target.value)}
-                    placeholder="e.g. Eleosstyles"
+                    placeholder="e.g. ABC Pharmacy"
                     autoComplete="organization"
                     autoFocus
                   />

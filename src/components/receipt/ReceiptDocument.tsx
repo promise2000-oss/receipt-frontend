@@ -1,5 +1,6 @@
 import { QRCodeSVG } from "qrcode.react";
 import { formatDate, formatDateTime, formatMoney, formatQuantity } from "@/lib/format";
+import { initials, onColor, safeAccent } from "@/lib/brand";
 import type { Business, Receipt } from "@/lib/types";
 import { cn } from "@/lib/cn";
 
@@ -10,8 +11,12 @@ const tint = (color: string, percent: number) =>
 interface ReceiptDocumentProps {
   receipt: Receipt;
   business: Business;
-  /** Public verification link — omit the QR block when it is unavailable. */
-  shareUrl?: string | null;
+  /**
+   * Non-expiring verification URL — this is what the QR code encodes, so a
+   * scan keeps working long after an expiring share link would have died.
+   * Omit the QR block entirely when it is unavailable.
+   */
+  verifyUrl?: string | null;
   className?: string;
 }
 
@@ -19,15 +24,30 @@ interface ReceiptDocumentProps {
  * The on-screen receipt — mirrors the final PDF template exactly:
  * brand header band, cream body, itemized table, gold total, QR verify.
  * Colours come from the business record so Settings pickers flow through.
+ *
+ * Physical output is not this component's problem: `@media print` in
+ * `globals.css` flattens the bands and tints to black on white, leaving only
+ * the logo in colour, while the QR stays pure black on white so it scans.
  */
 export function ReceiptDocument({
   receipt,
   business,
-  shareUrl,
+  verifyUrl,
   className,
 }: ReceiptDocumentProps) {
+  /**
+   * Brand colours as the receipt actually renders them.
+   *
+   * `primary` is left exactly as the organization set it — the band keeps
+   * their colour. What adapts is the text *on* it (`onPrimary`) and the
+   * accent (`safeAccent`), because Settings lets people type arbitrary hex
+   * and an accent that happens to sit at 3.9:1 on the band would quietly
+   * produce unreadable column headers. Deriving a pair from a logo goes
+   * through the same functions, so the guarantee holds either way.
+   */
   const primary = business.brand_primary;
-  const accent = business.brand_accent;
+  const accent = safeAccent(business.brand_accent, primary);
+  const onPrimary = onColor(primary);
   const currency = business.currency;
   const isVoid = receipt.status === "void";
 
@@ -41,7 +61,7 @@ export function ReceiptDocument({
     >
       {/* ---------- Brand header band ---------- */}
       <header
-        className="flex flex-wrap items-center justify-between gap-4 px-5 py-5 sm:px-8 sm:py-6"
+        className="doc-band flex flex-wrap items-center justify-between gap-4 px-5 py-5 sm:px-8 sm:py-6"
         style={{ backgroundColor: primary }}
       >
         <div className="flex items-center gap-3.5">
@@ -50,7 +70,13 @@ export function ReceiptDocument({
             <img
               src={business.logo_url}
               alt={`${business.name} logo`}
-              className="h-11 w-11 rounded-[10px] border border-white/20 bg-white/95 object-contain p-1"
+              className="h-11 w-11 rounded-[10px] border bg-white/95 object-contain p-1"
+              style={{
+                // Neutral plate so a transparent logo still reads, with a
+                // rim that follows the band text — otherwise a pale primary
+                // would swallow the plate entirely.
+                borderColor: `color-mix(in srgb, ${onPrimary} 28%, transparent)`,
+              }}
             />
           ) : (
             <span
@@ -58,11 +84,14 @@ export function ReceiptDocument({
               style={{ borderColor: tint(accent, 70), color: accent }}
               aria-hidden
             >
-              E
+              {initials(business.name)}
             </span>
           )}
           <div>
-            <div className="font-display text-[15px] uppercase leading-none tracking-[0.2em] text-white sm:text-base">
+            <div
+              className="font-display text-[15px] uppercase leading-none tracking-[0.2em] sm:text-base"
+              style={{ color: onPrimary }}
+            >
               {business.name}
             </div>
             <div
@@ -81,7 +110,10 @@ export function ReceiptDocument({
           >
             Receipt No.
           </div>
-          <div className="mt-1.5 font-display text-lg tracking-[0.08em] text-white">
+          <div
+            className="mt-1.5 font-display text-lg tracking-[0.08em]"
+            style={{ color: onPrimary }}
+          >
             {receipt.receipt_number}
           </div>
         </div>
@@ -89,7 +121,7 @@ export function ReceiptDocument({
 
       {/* ---------- Meta strip ---------- */}
       <div
-        className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3 border-b px-5 py-4 sm:px-8"
+        className="doc-meta flex flex-wrap items-center justify-between gap-x-6 gap-y-3 border-b px-5 py-4 sm:px-8"
         style={{ borderColor: tint(accent, 22), backgroundColor: tint(accent, 6) }}
       >
         <div>
@@ -146,7 +178,7 @@ export function ReceiptDocument({
           style={{ borderColor: tint(accent, 25) }}
         >
           <table className="w-full border-collapse text-sm">
-            <thead style={{ backgroundColor: primary }}>
+            <thead className="doc-table-head" style={{ backgroundColor: primary }}>
               <tr>
                 <th
                   className="px-4 py-3 text-left text-[10px] font-semibold uppercase tracking-[0.16em]"
@@ -219,9 +251,25 @@ export function ReceiptDocument({
                 </dd>
               </div>
             )}
+            {/*
+              Receipts are immutable, so one issued while tax applied still has
+              to reconcile on paper — otherwise the printed total does not add
+              up from the lines above it. New receipts carry tax = 0 and this
+              row never appears; there is no control in the form to set it.
+            */}
+            {receipt.tax > 0 && (
+              <div className="flex justify-between text-muted">
+                <dt>
+                  Tax{receipt.tax_rate > 0 ? ` (${receipt.tax_rate}%)` : ""}
+                </dt>
+                <dd className="tabular-nums text-ink">
+                  {formatMoney(receipt.tax, currency)}
+                </dd>
+              </div>
+            )}
             <div className="h-px w-full" style={{ backgroundColor: tint(accent, 40) }} />
             <div
-              className="flex items-center justify-between rounded-[10px] px-4 py-3"
+              className="doc-total flex items-center justify-between rounded-[10px] px-4 py-3"
               style={{ backgroundColor: accent }}
             >
               <dt
@@ -242,27 +290,34 @@ export function ReceiptDocument({
 
         {/* Verification + notes */}
         <div className="mt-7 grid gap-5 sm:grid-cols-[auto_1fr] sm:items-start">
-          {shareUrl ? (
-            <div
-              className="inline-flex w-fit items-center gap-3 rounded-[10px] border bg-white p-3"
+          {verifyUrl ? (
+            <figure
+              className="doc-qr m-0 inline-flex w-fit items-center gap-3 rounded-[10px] border bg-white p-3"
               style={{ borderColor: tint(accent, 30) }}
             >
+              {/*
+                Pure black on pure white, four modules of quiet zone, no logo
+                overlaid — every one of those is what keeps a code scannable
+                from a laser-printed sheet. Brand colour is not worth a code
+                that will not read.
+              */}
               <QRCodeSVG
-                value={shareUrl}
-                size={76}
-                bgColor="transparent"
-                fgColor={primary}
+                value={verifyUrl}
+                size={96}
+                marginSize={3}
+                bgColor="#ffffff"
+                fgColor="#111111"
                 level="M"
               />
-              <div className="max-w-[190px]">
+              <figcaption className="max-w-[200px]">
                 <div className="text-[10px] font-medium uppercase tracking-[0.2em] text-muted">
-                  Verify Receipt
+                  Scan to verify
                 </div>
                 <div className="mt-1 break-all text-[11px] leading-snug text-ink">
-                  {shareUrl}
+                  {verifyUrl}
                 </div>
-              </div>
-            </div>
+              </figcaption>
+            </figure>
           ) : null}
 
           {receipt.notes && (
@@ -280,14 +335,21 @@ export function ReceiptDocument({
 
         {/* Footer */}
         <div
-          className="mt-7 border-t pt-5 text-center"
+          className="doc-footer mt-7 border-t pt-5 text-center"
           style={{ borderColor: tint(accent, 25) }}
         >
           <p className="font-display text-[15px] text-ink">
             Thank you for your business
           </p>
           <p className="mt-1.5 text-xs text-muted">
-            {business.name} · {business.address} · {formatDate(receipt.issue_date)}
+            {business.name}
+            {business.address ? ` · ${business.address}` : ""}
+            {business.phone ? ` · ${business.phone}` : ""}
+            {business.email ? ` · ${business.email}` : ""}
+            {business.website ? ` · ${business.website}` : ""}
+          </p>
+          <p className="mt-1.5 text-[10px] uppercase tracking-[0.22em] text-muted">
+            {formatDate(receipt.issue_date)} · Powered by VisionaryGene
           </p>
         </div>
       </div>

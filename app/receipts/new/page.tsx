@@ -1,10 +1,13 @@
 import type { Metadata } from "next";
+import { pageTitle } from "@/lib/server/brand";
 import { ReceiptForm } from "@/components/receipt/ReceiptForm";
 
-export const metadata: Metadata = {
-  title: "New Receipt",
-  description: "Create and issue a branded receipt in under a minute.",
-};
+export async function generateMetadata(): Promise<Metadata> {
+  return {
+    title: await pageTitle("New Receipt"),
+    description: "Create and issue a branded receipt in under a minute.",
+  };
+}
 
 export default async function NewReceiptPage(
   props: PageProps<"/receipts/new">,

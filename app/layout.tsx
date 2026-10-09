@@ -18,11 +18,14 @@ const playfair = Playfair_Display({
 
 export const metadata: Metadata = {
   title: {
-    default: "Eleosstyles — Receipt System",
-    template: "%s · Eleosstyles",
+    default: "VisionaryGene — Receipt Platform",
+    // Each route composes its own full title (see `pageTitle`), so the
+    // template adds nothing by default — signed-out pages append the platform
+    // themselves and signed-in pages lead with the organization's name.
+    template: "%s",
   },
   description:
-    "Create, share, and track beautifully branded receipts for your business — in under a minute.",
+    "Create, share, and track beautifully branded receipts for your organization — in under a minute.",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

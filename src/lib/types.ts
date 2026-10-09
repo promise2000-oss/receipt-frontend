@@ -6,6 +6,12 @@ export type PaymentMethod = "cash" | "transfer" | "card" | "other";
 export type PaymentStatus = "paid" | "partial" | "pending";
 export type ReceiptStatus = "active" | "void";
 
+/**
+ * `owner` is the organization administrator, `staff` a regular member.
+ * Enforced server-side on organization settings; see `requireOwner` in the API.
+ */
+export type Role = "owner" | "staff";
+
 /* ------------------------------ Accounts ------------------------------ */
 
 /** What the app needs about the signed-in account. Never carries the password. */
@@ -14,6 +20,17 @@ export interface SessionInfo {
   org_name: string;
   owner_name: string;
   email: string;
+  role: Role;
+  /**
+   * The signed-in organization in full.
+   *
+   * `/auth/me` already returns it, so hanging it off the session means every
+   * identity surface — header, sidebar, dashboard, document titles — resolves
+   * from the one request the session provider was making anyway. Nothing has
+   * to fetch branding separately, and nothing can render a stale name after a
+   * rename.
+   */
+  business: Business;
 }
 
 export interface SignUpInput {
@@ -28,6 +45,10 @@ export interface SignInInput {
   password: string;
 }
 
+/**
+ * The organization. This *is* the tenant: receipts, customers, users and
+ * branding all hang off `id`, and the session decides which one you are.
+ */
 export interface Business {
   id: string;
   name: string;
@@ -35,10 +56,12 @@ export interface Business {
   address: string;
   phone: string;
   email: string;
+  website: string | null;
   currency: string;
   brand_primary: string;
   brand_accent: string;
   created_at: string;
+  updated_at: string;
 }
 
 export interface Customer {
@@ -72,6 +95,17 @@ export interface Receipt {
   items: ReceiptItem[];
   subtotal: number;
   discount: number;
+  /**
+   * Rate captured when the receipt was issued.
+   *
+   * Receipts are immutable, so a legacy document issued under a tax regime
+   * still has to reconcile on the printed page: subtotal → tax → total. New
+   * receipts are always issued at zero, and the form offers no tax control,
+   * so this is display-only — see {@link Receipt.tax}.
+   */
+  tax_rate: number;
+  /** Non-zero only on receipts issued before tax was dropped from the form. */
+  tax: number;
   total: number;
   payment_method: PaymentMethod;
   payment_status: PaymentStatus;

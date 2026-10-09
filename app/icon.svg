@@ -1,5 +1,13 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Receipt platform">
+  <!--
+    Platform mark, deliberately organization-neutral: a receipt shape, not a
+    letter or a name. The favicon is the one surface shared by every tenant,
+    so it must not belong to any of them.
+  -->
   <rect width="64" height="64" rx="14" fill="#111111"/>
   <rect x="5" y="5" width="54" height="54" rx="10" fill="none" stroke="#B8912F" stroke-opacity="0.55" stroke-width="2"/>
-  <text x="32" y="45" text-anchor="middle" font-family="Georgia, 'Times New Roman', serif" font-size="38" fill="#B8912F">E</text>
+  <path
+    d="M20 16h24a3 3 0 0 1 3 3v27.6a2.4 2.4 0 0 1-3.6 2.06L38.4 45.1a2.4 2.4 0 0 0-3.2 0L30 49.6a2.4 2.4 0 0 1-3.2 0l-5.2-4.5a2.4 2.4 0 0 0-3.2.06L17.6 48.4A2.4 2.4 0 0 1 14 46.4V19a3 3 0 0 1 3-3z"
+    fill="#111111" stroke="#B8912F" stroke-width="2.4" stroke-linejoin="round"/>
+  <path d="M23 25h18M23 32h18M23 39h11" stroke="#B8912F" stroke-width="2.6" stroke-linecap="round"/>
 </svg>

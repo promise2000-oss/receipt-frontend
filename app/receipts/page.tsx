@@ -1,11 +1,14 @@
 import type { Metadata } from "next";
+import { pageTitle } from "@/lib/server/brand";
 import { HistoryView } from "@/components/history/HistoryView";
 import type { ReceiptChip } from "@/lib/types";
 
-export const metadata: Metadata = {
-  title: "Receipts",
-  description: "Searchable history of every receipt you have issued.",
-};
+export async function generateMetadata(): Promise<Metadata> {
+  return {
+    title: await pageTitle("Receipts"),
+    description: "Searchable history of every receipt you have issued.",
+  };
+}
 
 const CHIPS: ReceiptChip[] = ["all", "paid", "partial", "pending", "void"];
 const PERIODS = ["all", "today", "week", "month"] as const;

@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { LogOut } from "lucide-react";
 import { NAV_ITEMS, type NavItem } from "./nav";
 import { useSession } from "@/components/auth/SessionProvider";
+import { initials as monogramOf } from "@/lib/brand";
 import { cn } from "@/lib/cn";
 
 function SidebarLink({ item, pathname }: { item: NavItem; pathname: string }) {
@@ -39,12 +40,8 @@ export function Sidebar() {
   const pathname = usePathname();
   const { session, signOut } = useSession();
 
-  const initials = (session?.org_name ?? "")
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((word) => word[0]?.toUpperCase())
-    .join("");
+  const org = session?.business;
+  const monogram = org ? monogramOf(org.name) : "";
 
   return (
     <aside className="no-print sticky top-16 hidden h-[calc(100dvh-4rem)] w-64 shrink-0 flex-col border-r border-brand-gold/20 bg-brand-black lg:flex">
@@ -56,12 +53,22 @@ export function Sidebar() {
 
       <div className="border-t border-brand-gold/15 p-4">
         <div className="flex items-center gap-3">
-          <span
-            className="grid h-9 w-9 shrink-0 place-items-center rounded-full border border-brand-gold/50 text-xs font-semibold text-brand-gold"
-            aria-hidden
-          >
-            {initials || "–"}
-          </span>
+          {org?.logo_url ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={org.logo_url}
+              alt=""
+              aria-hidden
+              className="h-9 w-9 shrink-0 rounded-full border border-brand-gold/40 bg-white object-contain p-0.5"
+            />
+          ) : (
+            <span
+              className="grid h-9 w-9 shrink-0 place-items-center rounded-full border border-brand-gold/50 text-xs font-semibold text-brand-gold"
+              aria-hidden
+            >
+              {monogram || "–"}
+            </span>
+          )}
           <span className="min-w-0 leading-tight">
             <span className="block truncate text-sm text-cream">
               {session?.org_name ?? "Signed out"}

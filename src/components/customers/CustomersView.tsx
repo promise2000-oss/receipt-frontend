@@ -13,7 +13,8 @@ import {
 } from "lucide-react";
 import { api } from "@/lib/api";
 import { formatDate, formatMoney, initials } from "@/lib/format";
-import type { Business, Customer, Receipt } from "@/lib/types";
+import type { Customer, Receipt } from "@/lib/types";
+import { useSession } from "@/components/auth/SessionProvider";
 import { Button, ButtonLink } from "@/components/ui/Button";
 import { Card, CardBody } from "@/components/ui/Card";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
@@ -32,7 +33,8 @@ export function CustomersView() {
   const router = useRouter();
   const [customers, setCustomers] = useState<Customer[] | null>(null);
   const [receipts, setReceipts] = useState<Receipt[]>([]);
-  const [business, setBusiness] = useState<Business | null>(null);
+  /** Currency only — the organization itself rides on the session. */
+  const business = useSession().session?.business ?? null;
   const [query, setQuery] = useState("");
 
   const [selected, setSelected] = useState<Customer | null>(null);
@@ -44,27 +46,21 @@ export function CustomersView() {
   const [saveTouched, setSaveTouched] = useState(false);
 
   function fetchAll() {
-    return Promise.all([
-      api.getCustomers(),
-      api.getReceipts(),
-      api.getBusiness(),
-    ]);
+    return Promise.all([api.getCustomers(), api.getReceipts()]);
   }
 
   async function load() {
-    const [customerList, receiptList, profile] = await fetchAll();
+    const [customerList, receiptList] = await fetchAll();
     setCustomers(customerList);
     setReceipts(receiptList);
-    setBusiness(profile);
   }
 
   useEffect(() => {
     let cancelled = false;
-    fetchAll().then(([customerList, receiptList, profile]) => {
+    fetchAll().then(([customerList, receiptList]) => {
       if (cancelled) return;
       setCustomers(customerList);
       setReceipts(receiptList);
-      setBusiness(profile);
     });
     return () => {
       cancelled = true;

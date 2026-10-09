@@ -19,6 +19,15 @@ interface SessionContextValue {
   signIn: (input: SignInInput) => Promise<void>;
   signUp: (input: SignUpInput) => Promise<void>;
   signOut: () => Promise<void>;
+  /**
+   * Re-read `GET /auth/me`.
+   *
+   * Called after organization settings are saved: the session carries the
+   * organization's name, logo and palette, so refreshing it is what makes a
+   * rename show up in the header, sidebar and document title without a page
+   * reload and without every surface fetching branding itself.
+   */
+  refresh: () => Promise<void>;
 }
 
 const SessionContext = createContext<SessionContextValue | null>(null);
@@ -36,11 +45,21 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     let cancelled = false;
-    api.getSession().then((current) => {
-      if (cancelled) return;
-      setSession(current);
-      setStatus(current ? "authenticated" : "unauthenticated");
-    });
+    api
+      .getSession()
+      .then((current) => {
+        if (cancelled) return;
+        setSession(current);
+        setStatus(current ? "authenticated" : "unauthenticated");
+      })
+      .catch(() => {
+        // The API could not be reached at all (offline, restarting). Neither
+        // answer is "signed out", but pinning someone on the splash forever
+        // is worse than showing the sign-in screen they can retry from.
+        if (cancelled) return;
+        setSession(null);
+        setStatus("unauthenticated");
+      });
     return () => {
       cancelled = true;
     };
@@ -64,9 +83,21 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     setStatus("unauthenticated");
   }, []);
 
+  const refresh = useCallback(async () => {
+    try {
+      const current = await api.getSession();
+      setSession(current);
+      setStatus(current ? "authenticated" : "unauthenticated");
+    } catch {
+      // A blip while re-reading the session must not sign the user out of a
+      // session that is still perfectly valid — keep what we already have and
+      // let the next natural load pick up the change.
+    }
+  }, []);
+
   return (
     <SessionContext.Provider
-      value={{ session, status, signIn, signUp, signOut }}
+      value={{ session, status, signIn, signUp, signOut, refresh }}
     >
       {children}
     </SessionContext.Provider>

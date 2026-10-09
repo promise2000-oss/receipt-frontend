@@ -6,11 +6,15 @@ import { useState, type FormEvent } from "react";
 import { Plus, Search } from "lucide-react";
 import { Logo } from "@/components/brand/Logo";
 import { ButtonLink } from "@/components/ui/Button";
+import { useSession } from "@/components/auth/SessionProvider";
 
-/** Solid black top bar — logo left, search, gold CTA always visible. */
+/** Solid black top bar — organization mark left, search, gold CTA always visible. */
 export function TopBar() {
   const router = useRouter();
+  const { session } = useSession();
   const [query, setQuery] = useState("");
+
+  const orgName = session?.business.name;
 
   function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -21,7 +25,11 @@ export function TopBar() {
   return (
     <header className="no-print sticky top-0 z-40 border-b border-brand-gold/20 bg-brand-black">
       <div className="flex h-16 items-center gap-3 px-4 sm:gap-4 sm:px-6 lg:px-8">
-        <Link href="/" aria-label="Eleosstyles dashboard" className="shrink-0">
+        <Link
+          href="/"
+          aria-label={session ? `${orgName} dashboard` : "Dashboard"}
+          className="shrink-0"
+        >
           <Logo variant="on-dark" showTagline={false} />
         </Link>
 

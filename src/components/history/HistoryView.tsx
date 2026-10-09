@@ -3,7 +3,8 @@
 import { useEffect, useState } from "react";
 import { Plus, Search, X } from "lucide-react";
 import { api } from "@/lib/api";
-import type { Business, Receipt, ReceiptChip } from "@/lib/types";
+import type { Receipt, ReceiptChip } from "@/lib/types";
+import { useSession } from "@/components/auth/SessionProvider";
 import { Button, ButtonLink } from "@/components/ui/Button";
 import { Card, CardBody } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -45,11 +46,8 @@ export function HistoryView({
     initialPeriod,
   );
   const [receipts, setReceipts] = useState<Receipt[] | null>(null);
-  const [business, setBusiness] = useState<Business | null>(null);
-
-  useEffect(() => {
-    api.getBusiness().then(setBusiness);
-  }, []);
+  /** Currency comes from the session's organization — no second fetch. */
+  const business = useSession().session?.business ?? null;
 
   useEffect(() => {
     let cancelled = false;

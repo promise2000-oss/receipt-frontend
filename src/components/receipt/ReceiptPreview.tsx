@@ -6,7 +6,8 @@ import { useRouter } from "next/navigation";
 import { ArrowLeft, Ban, CopyPlus } from "lucide-react";
 import { api } from "@/lib/api";
 import { formatDateTime } from "@/lib/format";
-import type { Business, Receipt } from "@/lib/types";
+import type { Receipt } from "@/lib/types";
+import { useSession } from "@/components/auth/SessionProvider";
 import { Button, ButtonLink } from "@/components/ui/Button";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -20,11 +21,19 @@ import { ShareBar } from "./ShareBar";
  */
 export function ReceiptPreview({ id }: { id: string }) {
   const router = useRouter();
+  /**
+   * The issuer's identity — the same object the header, sidebar and titles
+   * use, so there is one organization record in play rather than one fetch
+   * per screen. It is only ever this session's organization: the receipt id
+   * is loaded separately and the API refuses to hand back another tenant's.
+   */
+  const business = useSession().session?.business;
   /** undefined = loading · null = not found */
   const [receipt, setReceipt] = useState<Receipt | null | undefined>(undefined);
-  const [business, setBusiness] = useState<Business | null>(null);
-  /** undefined = loading · null = no public link for this receipt */
-  const [shareUrl, setShareUrl] = useState<string | null | undefined>(undefined);
+  /** undefined = loading · null = no public links for this receipt */
+  const [share, setShare] = useState<
+    { url: string; verify_url: string } | null | undefined
+  >(undefined);
   const [loadError, setLoadError] = useState<string | null>(null);
 
   const [voidOpen, setVoidOpen] = useState(false);
@@ -37,17 +46,15 @@ export function ReceiptPreview({ id }: { id: string }) {
     let cancelled = false;
     (async () => {
       try {
-        const [found, profile] = await Promise.all([
-          api.getReceipt(id),
-          api.getBusiness(),
-        ]);
+        const found = await api.getReceipt(id);
         if (cancelled) return;
-        // Public links are minted per receipt; if this fails we only lose the QR.
-        const url = found ? await api.getShareLink(found.id).catch(() => null) : null;
+        // Links are minted per receipt; if this fails we only lose the QR.
+        const links = found
+          ? await api.getShareLinks(found.id).catch(() => null)
+          : null;
         if (cancelled) return;
         setReceipt(found);
-        setBusiness(profile);
-        setShareUrl(url);
+        setShare(links);
       } catch (caught) {
         if (cancelled) return;
         setLoadError(
@@ -77,7 +84,7 @@ export function ReceiptPreview({ id }: { id: string }) {
     );
   }
 
-  if (receipt === undefined || !business || shareUrl === undefined)
+  if (receipt === undefined || !business || share === undefined)
     return <ReceiptPreviewSkeleton />;
 
   if (receipt === null) {
@@ -187,13 +194,13 @@ export function ReceiptPreview({ id }: { id: string }) {
         <ReceiptDocument
           receipt={receipt}
           business={business}
-          shareUrl={shareUrl}
+          verifyUrl={share?.verify_url ?? null}
         />
         <div className="mt-5">
           <ShareBar
             receipt={receipt}
             business={business}
-            shareUrl={shareUrl}
+            shareUrl={share?.url ?? null}
           />
         </div>
       </div>

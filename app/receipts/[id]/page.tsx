@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { pageTitle } from "@/lib/server/brand";
 import { ReceiptPreview } from "@/components/receipt/ReceiptPreview";
 
 export async function generateMetadata(
@@ -6,7 +7,7 @@ export async function generateMetadata(
 ): Promise<Metadata> {
   const { id } = await props.params;
   return {
-    title: `Receipt ${id}`,
+    title: await pageTitle(`Receipt ${id}`),
     description: `Preview, share, or download receipt ${id}.`,
   };
 }

@@ -15,7 +15,7 @@ import type {
 } from "./types";
 
 /**
- * Client for the Eleosstyles receipt API.
+ * Client for the receipt API (the platform is operated by VisionaryGene).
  *
  * All calls go to `/api/*` on *this* origin; `next.config.ts` rewrites them to
  * `API_URL` from `.env`. The proxy is what makes auth possible — the API
@@ -36,7 +36,7 @@ import type {
  *   GET    /receipts/:id             -> getReceipt()
  *   POST   /receipts                 -> createReceipt()
  *   POST   /receipts/:id/void        -> voidReceipt()
- *   GET    /receipts/:id/share       -> getShareLink()
+ *   GET    /receipts/:id/share       -> getShareLinks()
  *   GET    /dashboard/summary        -> getDashboardSummary()
  *
  * Responses arrive in the API's own shape (a `customer` object, a
@@ -82,11 +82,13 @@ interface ApiBusiness {
   address: string | null;
   phone: string | null;
   email: string | null;
+  website: string | null;
   currency: string;
   brand_primary: string;
   brand_accent: string;
   number_prefix: string;
   created_at: string;
+  updated_at: string;
 }
 
 interface ApiCustomer {
@@ -121,6 +123,8 @@ interface ApiReceipt {
   issue_date: string;
   subtotal: number;
   discount: number;
+  tax: number;
+  tax_rate: number;
   total: number;
   paid_amount: number;
   payment_method: PaymentMethod;
@@ -142,6 +146,7 @@ interface ApiAuth {
     business_id: string;
     full_name: string;
     email: string;
+    role: "owner" | "staff";
   };
   business: ApiBusiness;
 }
@@ -167,7 +172,13 @@ interface ApiDashboard {
 
 interface ApiShare {
   token: string;
+  /** Expiring link to the full public receipt page. */
   url: string;
+  /**
+   * Non-expiring verification page — what the receipt's QR code encodes.
+   * Absent on API builds that predate it, hence optional.
+   */
+  verify_url?: string;
   expires_at: string;
 }
 
@@ -234,10 +245,12 @@ function toBusiness(value: ApiBusiness): Business {
     address: value.address ?? "",
     phone: value.phone ?? "",
     email: value.email ?? "",
+    website: value.website ?? null,
     currency: value.currency,
     brand_primary: value.brand_primary,
     brand_accent: value.brand_accent,
     created_at: value.created_at,
+    updated_at: value.updated_at ?? value.created_at,
   };
 }
 
@@ -272,6 +285,8 @@ function toReceipt(value: ApiReceipt): Receipt {
     })),
     subtotal: value.subtotal,
     discount: value.discount,
+    tax: value.tax ?? 0,
+    tax_rate: value.tax_rate ?? 0,
     total: value.total,
     payment_method: value.payment_method,
     payment_status: value.payment_status,
@@ -290,6 +305,8 @@ function toSession(value: ApiAuth): SessionInfo {
     org_name: value.business.name,
     owner_name: value.user.full_name,
     email: value.user.email,
+    role: value.user.role,
+    business: toBusiness(value.business),
   };
 }
 
@@ -343,6 +360,7 @@ const BUSINESS_FIELDS = [
   "address",
   "phone",
   "email",
+  "website",
   "currency",
   "brand_primary",
   "brand_accent",
@@ -390,8 +408,18 @@ export const api = {
   async getSession(): Promise<SessionInfo | null> {
     try {
       return toSession(await request<ApiAuth>("/auth/me"));
-    } catch {
-      return null;
+    } catch (error) {
+      // Only an explicit rejection means "nobody is signed in". An offline
+      // browser, a rate limiter, or an API mid-restart says nothing about
+      // whether the cookie is valid, so let those surface instead of reading
+      // them as a logout.
+      if (
+        error instanceof ApiError &&
+        (error.status === 401 || error.status === 403)
+      ) {
+        return null;
+      }
+      throw error;
     }
   },
 
@@ -566,12 +594,24 @@ export const api = {
     }
   },
 
-  /** Public, expiring link to the receipt page — used by the QR and share row. */
-  async getShareLink(idOrNumber: string): Promise<string> {
+  /**
+   * Public links for a receipt.
+   *
+   * Returns both flavours because they exist for different lifetimes: `url`
+   * is the expiring link you send to a customer, while `verify_url` is the
+   * non-expiring verification page the QR code has to keep resolving to long
+   * after the share link would have lapsed.
+   */
+  async getShareLinks(
+    idOrNumber: string,
+  ): Promise<{ url: string; verify_url: string }> {
     const id = await resolveReceiptId(idOrNumber);
     if (!id) throw new ApiError("Receipt not found.", 404, "NOT_FOUND");
     const share = await request<ApiShare>(`/receipts/${id}/share`);
-    return share.url;
+    // Older API builds predate `verify_url`; fall back to the share link so
+    // the QR still resolves somewhere rather than disappearing.
+    const verify = share.verify_url || share.url;
+    return { url: share.url, verify_url: verify };
   },
 
   /* -------------------------------- Dashboard ----------------------------- */
