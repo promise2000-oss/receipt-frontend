@@ -11,7 +11,7 @@ import {
   UserPlus,
   X,
 } from "lucide-react";
-import { api } from "@/lib/api";
+import { api, readableError } from "@/lib/api";
 import { formatDate, formatMoney, initials } from "@/lib/format";
 import type { Customer, Receipt } from "@/lib/types";
 import { useSession } from "@/components/auth/SessionProvider";
@@ -20,6 +20,7 @@ import { Card, CardBody } from "@/components/ui/Card";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Field, TextInput } from "@/components/ui/Field";
+import { LoadError } from "@/components/ui/LoadError";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { ListSkeleton } from "@/components/ui/Skeleton";
 import { StatusBadge } from "@/components/ui/StatusBadge";
@@ -33,6 +34,11 @@ export function CustomersView() {
   const router = useRouter();
   const [customers, setCustomers] = useState<Customer[] | null>(null);
   const [receipts, setReceipts] = useState<Receipt[]>([]);
+  const [error, setError] = useState<string | null>(null);
+  /** Bumped by "Try again" — a failed read should be recoverable in place. */
+  const [attempt, setAttempt] = useState(0);
+  /** Failures creating a customer belong in the open dialog, not the list. */
+  const [saveError, setSaveError] = useState<string | null>(null);
   /** Currency only — the organization itself rides on the session. */
   const business = useSession().session?.business ?? null;
   const [query, setQuery] = useState("");
@@ -53,19 +59,35 @@ export function CustomersView() {
     const [customerList, receiptList] = await fetchAll();
     setCustomers(customerList);
     setReceipts(receiptList);
+    setError(null);
   }
 
   useEffect(() => {
     let cancelled = false;
-    fetchAll().then(([customerList, receiptList]) => {
-      if (cancelled) return;
-      setCustomers(customerList);
-      setReceipts(receiptList);
-    });
+    fetchAll()
+      .then(([customerList, receiptList]) => {
+        if (cancelled) return;
+        setCustomers(customerList);
+        setReceipts(receiptList);
+        setError(null);
+      })
+      .catch((caught: unknown) => {
+        // Both reads used to be dropped on the floor, so an unreachable API
+        // left the list on its skeleton and reported nothing.
+        if (cancelled) return;
+        setError(readableError(caught));
+      });
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [attempt]);
+
+  function retry() {
+    // An event handler, not an effect: dropping the message here is what makes
+    // the skeleton reappear instead of the stale failure.
+    setError(null);
+    setAttempt((value) => value + 1);
+  }
 
   const statsById = useMemo(() => {
     const map = new Map<string, CustomerStats>();
@@ -103,18 +125,37 @@ export function CustomersView() {
     setSaveTouched(true);
     if (newName.trim().length < 2 || saving) return;
     setSaving(true);
-    await api.createCustomer({
-      name: newName.trim(),
-      phone: newPhone.trim() || undefined,
-      email: newEmail.trim() || undefined,
-    });
-    setSaving(false);
+    setSaveError(null);
+
+    try {
+      await api.createCustomer({
+        name: newName.trim(),
+        phone: newPhone.trim() || undefined,
+        email: newEmail.trim() || undefined,
+      });
+    } catch (caught) {
+      // Keep the dialog open: a failure the reader can't see next to the form
+      // that caused it is worse than no message, and the confirm button must
+      // not stay stuck disabled either.
+      setSaveError(readableError(caught));
+      setSaving(false);
+      return;
+    }
+
     setModalOpen(false);
     setNewName("");
     setNewPhone("");
     setNewEmail("");
     setSaveTouched(false);
-    await load();
+    setSaving(false);
+
+    try {
+      await load();
+    } catch (caught) {
+      // The customer exists — only the list's view of it is stale, so this
+      // belongs to the list rather than to a dialog that has already closed.
+      setError(readableError(caught));
+    }
   }
 
   return (
@@ -149,7 +190,9 @@ export function CustomersView() {
       {/* List */}
       <Card>
         <CardBody padded={false}>
-          {!filtered ? (
+          {error && !filtered ? (
+            <LoadError message={error} onRetry={retry} />
+          ) : !filtered ? (
             <ListSkeleton rows={5} />
           ) : filtered.length === 0 ? (
             query ? (
@@ -369,9 +412,18 @@ export function CustomersView() {
           if (!saving) {
             setModalOpen(false);
             setSaveTouched(false);
+            setSaveError(null);
           }
         }}
       >
+        {saveError && (
+          <p
+            role="alert"
+            className="mb-4 text-sm leading-relaxed text-gold-deep"
+          >
+            {saveError}
+          </p>
+        )}
         <div className="space-y-3">
           <Field label="Full name" required>
             <TextInput

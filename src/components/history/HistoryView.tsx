@@ -2,12 +2,13 @@
 
 import { useEffect, useState } from "react";
 import { Plus, Search, X } from "lucide-react";
-import { api } from "@/lib/api";
+import { api, readableError } from "@/lib/api";
 import type { Receipt, ReceiptChip } from "@/lib/types";
 import { useSession } from "@/components/auth/SessionProvider";
 import { Button, ButtonLink } from "@/components/ui/Button";
 import { Card, CardBody } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { LoadError } from "@/components/ui/LoadError";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { SegmentedControl } from "@/components/ui/SegmentedControl";
 import { SelectInput } from "@/components/ui/Field";
@@ -35,6 +36,18 @@ interface HistoryViewProps {
   initialPeriod: (typeof PERIOD_OPTIONS)[number]["value"];
 }
 
+/**
+ * Identifies the filter set a request was for.
+ *
+ * Failures are tagged with this so that editing a filter hides a failure that
+ * is no longer about what is on screen. Clearing on input change instead would
+ * mean remembering to do it in all five handlers, including any that arrive
+ * from the URL later.
+ */
+function filterKey(query: string, chip: ReceiptChip, period: string): string {
+  return `${query}|${chip}|${period}`;
+}
+
 export function HistoryView({
   initialQuery,
   initialChip,
@@ -46,18 +59,50 @@ export function HistoryView({
     initialPeriod,
   );
   const [receipts, setReceipts] = useState<Receipt[] | null>(null);
+  /** The last failure, tagged with the filters it belongs to. */
+  const [failure, setFailure] = useState<{
+    key: string;
+    message: string;
+  } | null>(null);
+  /** Bumped by "Try again" — a failed read should be recoverable in place. */
+  const [attempt, setAttempt] = useState(0);
   /** Currency comes from the session's organization — no second fetch. */
   const business = useSession().session?.business ?? null;
 
   useEffect(() => {
     let cancelled = false;
-    api.getReceipts({ q: query, chip, period }).then((value) => {
-      if (!cancelled) setReceipts(value);
-    });
+    const key = filterKey(query, chip, period);
+    api
+      .getReceipts({ q: query, chip, period })
+      .then((value) => {
+        if (!cancelled) {
+          setReceipts(value);
+          setFailure(null);
+        }
+      })
+      .catch((caught: unknown) => {
+        // An unhandled rejection left this table on its skeleton forever, so a
+        // dropped connection read as a search that never finished.
+        if (cancelled) return;
+        setFailure({ key, message: readableError(caught) });
+      });
     return () => {
       cancelled = true;
     };
-  }, [query, chip, period]);
+  }, [query, chip, period, attempt]);
+
+  function retry() {
+    // An event handler, not an effect: dropping the message here is what makes
+    // the skeleton reappear instead of the stale failure.
+    setFailure(null);
+    setAttempt((value) => value + 1);
+  }
+
+  /** A failure is only shown while the filters it was raised under still apply. */
+  const error =
+    failure && failure.key === filterKey(query, chip, period)
+      ? failure.message
+      : null;
 
   const filtersActive = query.trim() !== "" || chip !== "all" || period !== "all";
 
@@ -132,9 +177,11 @@ export function HistoryView({
             ariaLabel="Filter by status"
           />
           <span className="text-xs text-muted" aria-live="polite">
-            {receipts
-              ? `${receipts.length} receipt${receipts.length === 1 ? "" : "s"}`
-              : "Loading…"}
+            {error
+              ? "Couldn't load"
+              : receipts
+                ? `${receipts.length} receipt${receipts.length === 1 ? "" : "s"}`
+                : "Loading…"}
           </span>
         </div>
       </div>
@@ -142,7 +189,12 @@ export function HistoryView({
       {/* ---- Results ---- */}
       <Card>
         <CardBody padded={false}>
-          {!receipts ? (
+          {/* The failure replaces the table rather than sitting beside it: the
+              rows still showing are for the filter that just failed, so they
+              read as an answer to the query now in the box. */}
+          {error ? (
+            <LoadError message={error} onRetry={retry} />
+          ) : !receipts ? (
             <TableSkeleton rows={6} />
           ) : receipts.length === 0 ? (
             filtersActive ? (

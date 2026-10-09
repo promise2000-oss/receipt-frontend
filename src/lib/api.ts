@@ -73,6 +73,19 @@ export class ApiError extends Error {
   }
 }
 
+/**
+ * Copy for a rejected read, safe to render inline.
+ *
+ * A view that only ever `.then()`s its fetch has nowhere to put a failure, so
+ * it surfaces as an unhandled rejection while the reader watches a skeleton
+ * that will never resolve — "slow" rather than "broken". Every caller ends up
+ * wanting the same two lines, so they live here.
+ */
+export function readableError(caught: unknown): string {
+  if (caught instanceof ApiError) return caught.message;
+  return "Something went wrong loading this. Try again.";
+}
+
 /* ------------------------------ Wire types ------------------------------ */
 
 interface ApiBusiness {
@@ -208,9 +221,12 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
 
   const text = await response.text();
   let payload: unknown = null;
+  /** Whether the body was JSON at all — an empty or HTML body is not. */
+  let parsedJson = false;
   if (text) {
     try {
       payload = JSON.parse(text);
+      parsedJson = true;
     } catch {
       payload = null;
     }
@@ -222,6 +238,21 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
       code?: string;
       details?: Record<string, string>;
     };
+
+    // The Next.js rewrite answers 5xx with an empty body whenever the API host
+    // itself is unreachable — DNS failure, a dropped connection, a service
+    // still waking up from cold. Our API always answers with JSON, so a 5xx
+    // that isn't JSON at all is a connectivity problem, not an application
+    // error. Without this the reader is told "returned an error (500)", which
+    // sends them hunting for a server bug that isn't there.
+    if (response.status >= 500 && !parsedJson) {
+      throw new ApiError(
+        "Can't reach the receipt service. Check your connection and try again.",
+        response.status,
+        "NETWORK_ERROR",
+      );
+    }
+
     throw new ApiError(
       problem.message ?? `The receipt service returned an error (${response.status}).`,
       response.status,
