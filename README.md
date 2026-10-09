@@ -71,12 +71,127 @@ The `Business` record **is** the organization. There is no second tenant model.
 
 ## Design system
 
-- **Palette:** cream `#FBF7EE` background, black `#111111` header/sidebar, gold
-  `#B8912F` accent with `#D9B45C` tint, ink `#22262E` text, muted `#5A6472` secondary.
-- **Type:** Inter for UI, Playfair Display for the wordmark and receipt headings.
-- **One primary button:** solid gold with black text; secondary = black with gold text;
-  destructive = muted grey outline (no red).
-- Tokens live in `app/globals.css` (Tailwind v4 CSS-first `@theme` block).
+**Dark-first.** Every colour in the product is declared once, in `:root` inside
+`app/globals.css`. The `@theme inline` block below it maps those same custom
+properties onto Tailwind's colour namespace, so `bg-vg-surface-2` and
+`var(--vg-surface-2)` are literally the same value and cannot drift apart. No
+component contains a hex literal.
+
+| Token | Value | Used for |
+| --- | --- | --- |
+| `--vg-red-900` | `#B71C1C` | Primary fills, borders, large elements |
+| `--vg-orange-red` | `#D4430F` | Accent fills, rules, icons, large text |
+| `--vg-white` / `--vg-black` | `#FFFFFF` / `#050505` | Text / app background |
+| `--vg-surface-1` | `#0B0B0B` | Top bar, sidebar, bottom nav, table header |
+| `--vg-surface-2` | `#141414` | Cards, panels, inputs |
+| `--vg-surface-3` | `#262525` | Raised elements, hover, borders, loader track |
+| `--vg-text-muted` | `#A8A3A2` | Secondary text, labels, captions |
+| `--vg-row-hover` | `#1B1B1B` | Table and list row hover |
+
+**Contrast.** Several tokens exist only because their parent failed WCAG AA on a
+dark surface, and each carries its measured ratio in the token file:
+
+- **Brand red is never used for text.** `#B71C1C` reaches only 3.10:1 on the app
+  background and 2.80:1 on a card. It carries fills, borders, the active nav
+  item, and large elements — nothing small.
+- **`--vg-accent-text` (`#DA5F33`) exists for small accent text.** `#D4430F`
+  tops out at 4.47:1, just under the 4.5:1 body bar; lightened 15% it clears
+  5.50 / 5.31 / 4.97:1 on app / nav / card. Links, the wordmark's "GENE", and
+  small accents use it.
+- **Status sits outside the brand family.** Green `#4CAF50` (6.63:1) for Paid —
+  the spec's `#2E7D32` only manages 3.59:1 — amber `#FFB300` for Pending, and
+  `#FF5252` (5.77:1) for errors, so a problem is never confused with the
+  brand. Void leans on a red *border and fill* with white text, because red
+  lettering would not clear contrast.
+- **Placeholder and disabled text are lifted** from the spec's `#6B6766`
+  (3.30:1 and 2.73:1) to `#898585` and `#979594`.
+
+Status is never carried by colour alone — every badge pairs a hue with a glyph
+and a word, the active nav item has both a fill and a 3px indicator, and void
+rows are struck through.
+
+**Type:** one geometric sans — Inter. The former Playfair Display pairing was
+dropped along with the light theme.
+
+**Shape:** buttons 8px, inputs 8px, cards and panels 12px.
+
+**Motion:** `prefers-reduced-motion: reduce` collapses every animation and
+transition, and the loading shimmer becomes a static block.
+
+**Focus:** inputs take an accent border plus a 20%-opacity accent glow; every
+other interactive element takes the global 2px accent ring at 2px offset.
+
+### Responsive behaviour
+
+Tables collapse to stacked cards at the `sm` breakpoint (640px) in both the
+receipt list and the line-item editor. Every button, nav item, and icon button
+is at least 44px tall — the three button sizes step 44 / 48 / 52px rather than
+shrinking below the touch floor.
+
+## Print / PDF
+
+**Download PDF** on a receipt opens the browser print dialog. Print styles in
+`app/globals.css` hide all app chrome (top bar, sidebar, page title, share
+buttons) and render only the receipt document.
+
+The printout is deliberately **monochrome**: the page goes white, header bands
+become rules, tinted strips become white, and all text goes black — high
+contrast, low ink, and it stays legible on any office printer. Four things keep
+their colour on purpose, all red enough to survive as *darker* ink on a mono
+printer: the **header rule**, the **total**, the **footer rule**, and the
+organization's **logo**. The **QR code** stays pure black on white so it scans.
+
+The receipt document stays a light "paper" object even on the dark app. An
+organization's logo and header band are designed for white, and a dark preview
+would stop predicting what actually prints — so what changes on dark is the
+frame the paper sits in (`.receipt-frame`), which the print stylesheet removes
+entirely.
+
+The on-screen document and the API's own exported PDF keep the full brand
+treatment.
+
+## Organization branding on the receipt
+
+The receipt carries **the issuing organization's** colours — `brand_primary`
+and `brand_accent` — not the platform's. A new organization defaults to a
+near-black band with the brand orange-red accent (`safeAccent` repairs it to
+`#D75121` against that band); the band deliberately does *not* default to brand
+red, because the accent solver washes the accent out to near-pink on a red
+band. Settings lets either be changed, and the accent is nudged whenever it
+would fall below WCAG contrast against the primary, so the picker and the
+receipt always agree.
+
+## Brand assets
+
+The VisionaryGene mark is derived from the source artwork and committed as
+files, so nothing is generated at build time and no image CDN is involved.
+
+| File | Purpose |
+| --- | --- |
+| `app/icon.png` | Browser tab favicon (512px, black rounded plate) |
+| `app/apple-icon.png` | iOS home-screen icon (180px, square — iOS masks it) |
+| `app/opengraph-image.png` | Social/link preview card (1200×630) |
+| `public/brand/mark.png` | The mark on transparent — used by `Logo.tsx` |
+| `public/brand/logo-lockup.png` | Mark over the `VISIONARYGENE` wordmark, on black |
+
+Two decisions are baked into those files:
+
+- **The mark is red ink on a transparent plate.** The neuron lines are *holes*,
+  not white pixels, so one file reads correctly on both the black top bar and the
+  cream loading splash. The favicon and OG card instead sit on an explicit black
+  plate, because the white half of the wordmark would vanish on a light surface
+  and the thin neuron lines disappear when scaled into a 16px tab.
+- **The favicon carries the platform mark, not a tenant's.** It is the one
+  surface every organization shares, so it identifies the platform rather than
+  whichever workspace happens to be open. A signed-in organization still leads
+  the header, sidebar, receipt, and page title with its own logo.
+
+`Logo.tsx` prefers the signed-in organization's uploaded logo, then its
+monogram, and only falls back to the platform mark when nobody is signed in
+(the loading splash and the sign-in / sign-up screens).
+
+`SITE_URL` (see `.env.example`) is the public origin used to resolve the
+absolute Open Graph URL; it defaults to `http://localhost:3000`.
 
 ## Data layer
 
@@ -176,7 +291,10 @@ date, customer, line items, subtotal, discount, total, and a QR code.
 
 ```
 app/                  # routes only (layouts & pages, incl. generateMetadata)
+                      # + icon.png / apple-icon.png / opengraph-image.png
+app/globals.css       # the ONLY place a hex value is written (`:root` tokens)
 next.config.ts        # /api/* rewrite proxy to API_URL
+public/brand/         # mark.png, logo-lockup.png
 src/
   components/
     auth/             # session provider + login/signup screen
@@ -193,19 +311,6 @@ src/
     server/brand.ts   # server-side organization name for page titles
     types.ts          # domain types
 ```
-
-## Printing / PDF
-
-**Download PDF** on a receipt opens the browser print dialog. Print styles in
-`app/globals.css` hide all app chrome (top bar, sidebar, page title, share
-buttons) and render only the receipt document.
-
-The printout is deliberately **monochrome**: header bands become rules, tinted
-strips become white, and all text goes black — high contrast, low ink, and it
-stays legible on any office printer. Two things keep their colour on purpose:
-the organization's **logo**, and the **QR code**, which stays pure black on
-white so it scans. The on-screen document and the API's own exported PDF keep
-the full brand treatment.
 
 ### Logo
 

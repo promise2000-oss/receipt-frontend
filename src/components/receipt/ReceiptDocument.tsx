@@ -8,6 +8,10 @@ import { cn } from "@/lib/cn";
 const tint = (color: string, percent: number) =>
   `color-mix(in srgb, ${color} ${percent}%, transparent)`;
 
+/** See the note where they are used: a QR code's contrast is format-fixed. */
+const QR_BG = "#ffffff";
+const QR_FG = "#000000";
+
 interface ReceiptDocumentProps {
   receipt: Receipt;
   business: Business;
@@ -22,12 +26,19 @@ interface ReceiptDocumentProps {
 
 /**
  * The on-screen receipt — mirrors the final PDF template exactly:
- * brand header band, cream body, itemized table, gold total, QR verify.
+ * brand header band, paper body, itemized table, accent total, QR verify.
  * Colours come from the business record so Settings pickers flow through.
  *
+ * The document deliberately stays a *light paper object* even though the app
+ * around it is dark. Two reasons: an organization's logo and header band are
+ * designed for white, and a dark preview would stop predicting what the
+ * printout actually looks like. What changes on dark is the surface the paper
+ * sits on — a raised panel that frames it.
+ *
  * Physical output is not this component's problem: `@media print` in
- * `globals.css` flattens the bands and tints to black on white, leaving only
- * the logo in colour, while the QR stays pure black on white so it scans.
+ * `globals.css` flattens the bands and tints to black on white with brand red
+ * kept for the rules and the total, while the QR stays pure black on white so
+ * it scans.
  */
 export function ReceiptDocument({
   receipt,
@@ -52,13 +63,16 @@ export function ReceiptDocument({
   const isVoid = receipt.status === "void";
 
   return (
-    <article
+    <div
       className={cn(
-        "receipt-document relative overflow-hidden rounded-card border bg-cream",
+        "receipt-frame rounded-card border border-vg-border bg-vg-surface-2 p-4 sm:p-8",
         className,
       )}
-      style={{ borderColor: tint(accent, 35) }}
     >
+      <article
+        className="receipt-document relative mx-auto max-w-[720px] overflow-hidden rounded-card border bg-vg-paper-bg"
+        style={{ borderColor: tint(accent, 35) }}
+      >
       {/* ---------- Brand header band ---------- */}
       <header
         className="doc-band flex flex-wrap items-center justify-between gap-4 px-5 py-5 sm:px-8 sm:py-6"
@@ -80,7 +94,7 @@ export function ReceiptDocument({
             />
           ) : (
             <span
-              className="grid h-11 w-11 place-items-center rounded-[10px] border font-display text-2xl leading-none"
+              className="grid h-11 w-11 place-items-center rounded-[10px] border text-2xl leading-none"
               style={{ borderColor: tint(accent, 70), color: accent }}
               aria-hidden
             >
@@ -89,7 +103,7 @@ export function ReceiptDocument({
           )}
           <div>
             <div
-              className="font-display text-[15px] uppercase leading-none tracking-[0.2em] sm:text-base"
+              className="text-[15px] uppercase leading-none tracking-[0.2em] sm:text-base"
               style={{ color: onPrimary }}
             >
               {business.name}
@@ -111,7 +125,7 @@ export function ReceiptDocument({
             Receipt No.
           </div>
           <div
-            className="mt-1.5 font-display text-lg tracking-[0.08em]"
+            className="mt-1.5 text-lg tracking-[0.08em]"
             style={{ color: onPrimary }}
           >
             {receipt.receipt_number}
@@ -125,18 +139,18 @@ export function ReceiptDocument({
         style={{ borderColor: tint(accent, 22), backgroundColor: tint(accent, 6) }}
       >
         <div>
-          <div className="text-[10px] uppercase tracking-[0.2em] text-muted">Issued</div>
-          <div className="mt-1 text-sm text-ink">{formatDateTime(receipt.issue_date)}</div>
+          <div className="text-[10px] uppercase tracking-[0.2em] text-vg-paper-muted">Issued</div>
+          <div className="mt-1 text-sm text-vg-paper-ink">{formatDateTime(receipt.issue_date)}</div>
         </div>
         <div>
-          <div className="text-[10px] uppercase tracking-[0.2em] text-muted">
+          <div className="text-[10px] uppercase tracking-[0.2em] text-vg-paper-muted">
             Payment Method
           </div>
-          <div className="mt-1 text-sm capitalize text-ink">{receipt.payment_method}</div>
+          <div className="mt-1 text-sm capitalize text-vg-paper-ink">{receipt.payment_method}</div>
         </div>
         <div>
-          <div className="text-[10px] uppercase tracking-[0.2em] text-muted">Status</div>
-          <div className="mt-1 text-sm capitalize text-ink">
+          <div className="text-[10px] uppercase tracking-[0.2em] text-vg-paper-muted">Status</div>
+          <div className="mt-1 text-sm capitalize text-vg-paper-ink">
             {isVoid ? "Voided" : receipt.payment_status}
           </div>
         </div>
@@ -147,26 +161,26 @@ export function ReceiptDocument({
         {/* Billed to / From */}
         <div className="grid gap-5 sm:grid-cols-2">
           <div>
-            <div className="text-[10px] font-medium uppercase tracking-[0.22em] text-muted">
+            <div className="text-[10px] font-medium uppercase tracking-[0.22em] text-vg-paper-muted">
               Billed To
             </div>
-            <div className="mt-2 text-[15px] font-medium text-ink">
+            <div className="mt-2 text-[15px] font-medium text-vg-paper-ink">
               {receipt.customer_name}
             </div>
             {receipt.customer_phone && (
-              <div className="mt-1 text-sm text-muted">{receipt.customer_phone}</div>
+              <div className="mt-1 text-sm text-vg-paper-muted">{receipt.customer_phone}</div>
             )}
             {receipt.customer_email && (
-              <div className="text-sm text-muted">{receipt.customer_email}</div>
+              <div className="text-sm text-vg-paper-muted">{receipt.customer_email}</div>
             )}
           </div>
           <div className="sm:text-right">
-            <div className="text-[10px] font-medium uppercase tracking-[0.22em] text-muted">
+            <div className="text-[10px] font-medium uppercase tracking-[0.22em] text-vg-paper-muted">
               From
             </div>
-            <div className="mt-2 text-[15px] font-medium text-ink">{business.name}</div>
-            <div className="mt-1 text-sm text-muted">{business.address}</div>
-            <div className="text-sm text-muted">
+            <div className="mt-2 text-[15px] font-medium text-vg-paper-ink">{business.name}</div>
+            <div className="mt-1 text-sm text-vg-paper-muted">{business.address}</div>
+            <div className="text-sm text-vg-paper-muted">
               {business.phone} · {business.email}
             </div>
           </div>
@@ -213,19 +227,19 @@ export function ReceiptDocument({
                   className="border-t"
                   style={{ borderColor: tint(accent, 15) }}
                 >
-                  <td className="px-4 py-3.5 text-ink">
+                  <td className="px-4 py-3.5 text-vg-paper-ink">
                     {item.description}
-                    <span className="mt-0.5 block text-xs text-muted sm:hidden">
+                    <span className="mt-0.5 block text-xs text-vg-paper-muted sm:hidden">
                       {formatMoney(item.unit_price, currency)} each
                     </span>
                   </td>
-                  <td className="px-3 py-3.5 text-center tabular-nums text-muted">
+                  <td className="px-3 py-3.5 text-center tabular-nums text-vg-paper-muted">
                     {formatQuantity(item.quantity)}
                   </td>
-                  <td className="hidden px-3 py-3.5 text-right tabular-nums text-muted sm:table-cell">
+                  <td className="hidden px-3 py-3.5 text-right tabular-nums text-vg-paper-muted sm:table-cell">
                     {formatMoney(item.unit_price, currency)}
                   </td>
-                  <td className="px-4 py-3.5 text-right font-medium tabular-nums text-ink">
+                  <td className="px-4 py-3.5 text-right font-medium tabular-nums text-vg-paper-ink">
                     {formatMoney(item.line_total, currency)}
                   </td>
                 </tr>
@@ -237,14 +251,14 @@ export function ReceiptDocument({
         {/* Totals */}
         <div className="mt-6 flex justify-end">
           <dl className="w-full max-w-sm space-y-2.5 text-sm">
-            <div className="flex justify-between text-muted">
+            <div className="flex justify-between text-vg-paper-muted">
               <dt>Subtotal</dt>
-              <dd className="tabular-nums text-ink">
+              <dd className="tabular-nums text-vg-paper-ink">
                 {formatMoney(receipt.subtotal, currency)}
               </dd>
             </div>
             {receipt.discount > 0 && (
-              <div className="flex justify-between text-muted">
+              <div className="flex justify-between text-vg-paper-muted">
                 <dt>Discount</dt>
                 <dd className="tabular-nums" style={{ color: tint(primary, 70) }}>
                   − {formatMoney(receipt.discount, currency)}
@@ -258,11 +272,11 @@ export function ReceiptDocument({
               row never appears; there is no control in the form to set it.
             */}
             {receipt.tax > 0 && (
-              <div className="flex justify-between text-muted">
+              <div className="flex justify-between text-vg-paper-muted">
                 <dt>
                   Tax{receipt.tax_rate > 0 ? ` (${receipt.tax_rate}%)` : ""}
                 </dt>
-                <dd className="tabular-nums text-ink">
+                <dd className="tabular-nums text-vg-paper-ink">
                   {formatMoney(receipt.tax, currency)}
                 </dd>
               </div>
@@ -279,7 +293,7 @@ export function ReceiptDocument({
                 Total
               </dt>
               <dd
-                className="text-xl font-semibold tabular-nums sm:text-2xl"
+                className="text-2xl font-bold tabular-nums sm:text-3xl"
                 style={{ color: primary }}
               >
                 {formatMoney(receipt.total, currency)}
@@ -292,7 +306,7 @@ export function ReceiptDocument({
         <div className="mt-7 grid gap-5 sm:grid-cols-[auto_1fr] sm:items-start">
           {verifyUrl ? (
             <figure
-              className="doc-qr m-0 inline-flex w-fit items-center gap-3 rounded-[10px] border bg-white p-3"
+              className="doc-qr m-0 inline-flex w-fit items-center gap-3 rounded-[10px] border bg-vg-paper-bg p-3"
               style={{ borderColor: tint(accent, 30) }}
             >
               {/*
@@ -300,20 +314,25 @@ export function ReceiptDocument({
                 overlaid — every one of those is what keeps a code scannable
                 from a laser-printed sheet. Brand colour is not worth a code
                 that will not read.
+
+                These two literals are the deliberate exception to "no hex
+                outside globals.css". A QR is a machine-readable code, not a
+                design surface: the format fixes its contrast, so tinting it
+                with a brand token would be a regression, not theming.
               */}
               <QRCodeSVG
                 value={verifyUrl}
                 size={96}
                 marginSize={3}
-                bgColor="#ffffff"
-                fgColor="#111111"
+                bgColor={QR_BG}
+                fgColor={QR_FG}
                 level="M"
               />
               <figcaption className="max-w-[200px]">
-                <div className="text-[10px] font-medium uppercase tracking-[0.2em] text-muted">
+                <div className="text-[10px] font-medium uppercase tracking-[0.2em] text-vg-paper-muted">
                   Scan to verify
                 </div>
-                <div className="mt-1 break-all text-[11px] leading-snug text-ink">
+                <div className="mt-1 break-all text-[11px] leading-snug text-vg-paper-ink">
                   {verifyUrl}
                 </div>
               </figcaption>
@@ -325,10 +344,10 @@ export function ReceiptDocument({
               className="rounded-[10px] border px-4 py-3.5"
               style={{ borderColor: tint(accent, 20), backgroundColor: tint(accent, 5) }}
             >
-              <div className="text-[10px] font-medium uppercase tracking-[0.2em] text-muted">
+              <div className="text-[10px] font-medium uppercase tracking-[0.2em] text-vg-paper-muted">
                 Notes
               </div>
-              <p className="mt-1.5 text-sm leading-relaxed text-ink">{receipt.notes}</p>
+              <p className="mt-1.5 text-sm leading-relaxed text-vg-paper-ink">{receipt.notes}</p>
             </div>
           )}
         </div>
@@ -338,17 +357,17 @@ export function ReceiptDocument({
           className="doc-footer mt-7 border-t pt-5 text-center"
           style={{ borderColor: tint(accent, 25) }}
         >
-          <p className="font-display text-[15px] text-ink">
+          <p className="text-[15px] text-vg-paper-ink">
             Thank you for your business
           </p>
-          <p className="mt-1.5 text-xs text-muted">
+          <p className="mt-1.5 text-xs text-vg-paper-muted">
             {business.name}
             {business.address ? ` · ${business.address}` : ""}
             {business.phone ? ` · ${business.phone}` : ""}
             {business.email ? ` · ${business.email}` : ""}
             {business.website ? ` · ${business.website}` : ""}
           </p>
-          <p className="mt-1.5 text-[10px] uppercase tracking-[0.22em] text-muted">
+          <p className="mt-1.5 text-[10px] uppercase tracking-[0.22em] text-vg-paper-muted">
             {formatDate(receipt.issue_date)} · Powered by VisionaryGene
           </p>
         </div>
@@ -361,13 +380,14 @@ export function ReceiptDocument({
           className="pointer-events-none absolute inset-0 grid place-items-center"
         >
           <span
-            className="-rotate-[18deg] font-display text-[clamp(3rem,14vw,7rem)] uppercase tracking-[0.24em]"
+            className="-rotate-[18deg] text-[clamp(3rem,14vw,7rem)] uppercase tracking-[0.24em]"
             style={{ color: tint(primary, 12) }}
           >
             Void
           </span>
         </div>
       )}
-    </article>
+      </article>
+    </div>
   );
 }

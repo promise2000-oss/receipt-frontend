@@ -1,31 +1,137 @@
 @import "tailwindcss";
 
 /* ============================================================
-   Receipt platform — design tokens (Tailwind v4 CSS-first theme)
-   Cream / Black / Gold only. Flat, minimal, no heavy shadows.
-   ============================================================ */
-@theme inline {
-  /* Brand palette */
-  --color-cream: #fbf7ee;
-  --color-surface: #fffdf8;
-  --color-line: #e9e1cd;
-  --color-brand-black: #111111;
-  --color-brand-gold: #b8912f;
-  --color-brand-gold-soft: #d9b45c;
-  --color-gold-deep: #8a6d1f;
-  --color-ink: #22262e;
-  --color-muted: #5a6472;
+   VisionaryGene design tokens
+   ------------------------------------------------------------
+   THE single source of truth for colour in this codebase.
 
-  /* Type */
+   Every hex value lives in `:root` below and nowhere else. The
+   `@theme inline` block then maps the same custom properties onto
+   Tailwind's colour namespace, so `bg-vg-surface-2` and
+   `var(--vg-surface-2)` are literally the same value and cannot
+   drift apart.
+
+   Why `:root` + `@theme inline` rather than plain `@theme`:
+   plain `@theme` tree-shakes variables that no utility references,
+   which silently breaks the raw `var()` reads in the print block and
+   the empty-state SVG fills. Declaring here and mapping there keeps
+   every token addressable from both CSS and TSX.
+   ============================================================ */
+
+:root {
+  /* ---- Brand palette (as specified) ---- */
+  --vg-red-900: #b71c1c;
+  --vg-orange-red: #d4430f;
+  --vg-white: #ffffff;
+  --vg-black: #050505;
+  --vg-surface-1: #0b0b0b;
+  --vg-surface-2: #141414;
+  --vg-surface-3: #262525;
+  --vg-text-muted: #a8a3a2;
+  --vg-border: #262525;
+
+  /* ---- Derived states ----
+     Hover/active are the specified ±8% / ±14% shifts. The rest are
+     contrast repairs — each one exists because the token it derives
+     from failed WCAG AA on a dark surface. The measured ratios are in
+     the comments; re-measure before changing any of them. */
+  --vg-red-900-hover: #a81a1a; /* darken 8%  · white on it = 7.43:1 */
+  --vg-red-900-active: #9d1818; /* darken 14% · white on it = 8.15:1 */
+  --vg-orange-red-hover: #e25521; /* lighten 8% · graphic/icon use only */
+
+  /* Brand red is 3.10:1 on the app background and 2.80:1 on a card —
+     well under the 4.5:1 body-text bar — so it is used for fills,
+     borders and large elements ONLY. This is the lightened accent
+     that *does* clear AA for small text: 5.50 / 5.31 / 4.97:1 on
+     app / nav / card. */
+  --vg-accent-text: #da5f33;
+  --vg-accent-text-hover: #e25521;
+
+  --vg-row-hover: #1b1b1b;
+  --vg-placeholder: #898585; /* 5.05:1 on the #141414 input fill */
+  --vg-disabled-bg: #262525;
+  --vg-disabled-text: #979594; /* 5.13:1 on the disabled fill */
+
+  /* Status. Green is deliberately NOT the brand palette — a green that
+     sits in the red family would read as "error" here. #2e7d32 only
+     reaches 3.59:1 on a card, so it fills while #4caf50 (6.63:1)
+     carries the text. */
+  --vg-success: #4caf50;
+  --vg-success-strong: #2e7d32;
+  --vg-warning: #ffb300;
+  --vg-error: #ff5252; /* 5.77:1 on a card — clear of brand red */
+  --vg-error-strong: #c62828;
+
+  --vg-overlay: rgb(0 0 0 / 0.7);
+
+  /* ---- Paper: the receipt document's own ink set ----
+     The document is a white object even on the dark app, so it cannot borrow
+     the interface's text tokens — white-on-white is the obvious failure and
+     muted-grey-on-white is the subtle one. These exist so the paper and the
+     print stylesheet read from the same values. */
+  --vg-paper-bg: #ffffff;
+  --vg-paper-ink: #111111;
+  --vg-paper-muted: #555555;
+  --vg-paper-rule: #e5e5e5;
+
+  /* ---- Print: the receipt is a different medium ----
+     Paper is white and ink is black. Brand red survives only as the
+     logo, the header/total/footer rules — everything else flattens,
+     so a monochrome office printer still reconciles the figures. */
+  --vg-print-bg: var(--vg-paper-bg);
+  --vg-print-ink: var(--vg-paper-ink);
+  --vg-print-muted: var(--vg-paper-muted);
+  --vg-print-rule: var(--vg-red-900);
+
+  /* ---- Radii ---- */
+  --vg-radius-button: 8px;
+  --vg-radius-control: 8px;
+  --vg-radius-card: 12px;
+}
+
+/* Map the tokens onto Tailwind's namespaces. `inline` substitutes the
+   value into each utility rather than re-declaring it, which keeps
+   opacity modifiers (`bg-vg-red-900/12`) working through color-mix. */
+@theme inline {
+  --color-vg-red-900: var(--vg-red-900);
+  --color-vg-red-900-hover: var(--vg-red-900-hover);
+  --color-vg-red-900-active: var(--vg-red-900-active);
+  --color-vg-orange-red: var(--vg-orange-red);
+  --color-vg-orange-red-hover: var(--vg-orange-red-hover);
+  --color-vg-accent-text: var(--vg-accent-text);
+  --color-vg-accent-text-hover: var(--vg-accent-text-hover);
+
+  --color-vg-white: var(--vg-white);
+  --color-vg-black: var(--vg-black);
+  --color-vg-surface-1: var(--vg-surface-1);
+  --color-vg-surface-2: var(--vg-surface-2);
+  --color-vg-surface-3: var(--vg-surface-3);
+  --color-vg-row-hover: var(--vg-row-hover);
+  --color-vg-border: var(--vg-border);
+  --color-vg-text-muted: var(--vg-text-muted);
+  --color-vg-placeholder: var(--vg-placeholder);
+
+  --color-vg-disabled-bg: var(--vg-disabled-bg);
+  --color-vg-disabled-text: var(--vg-disabled-text);
+  --color-vg-success: var(--vg-success);
+  --color-vg-success-strong: var(--vg-success-strong);
+  --color-vg-warning: var(--vg-warning);
+  --color-vg-error: var(--vg-error);
+  --color-vg-error-strong: var(--vg-error-strong);
+
+  --color-vg-paper-bg: var(--vg-paper-bg);
+  --color-vg-paper-ink: var(--vg-paper-ink);
+  --color-vg-paper-muted: var(--vg-paper-muted);
+  --color-vg-paper-rule: var(--vg-paper-rule);
+
+  /* One geometric sans for the whole product — Inter. */
   --font-sans: var(--font-inter), ui-sans-serif, system-ui, -apple-system,
     "Segoe UI", Roboto, sans-serif;
-  --font-display: var(--font-playfair), "Playfair Display", Georgia, serif;
 
-  /* Radii — 8–12px, per brand spec */
-  --radius-card: 12px;
-  --radius-control: 10px;
+  --radius-button: var(--vg-radius-button);
+  --radius-control: var(--vg-radius-control);
+  --radius-card: var(--vg-radius-card);
 
-  /* Soft gold shimmer for loading states */
   --animate-shimmer: shimmer 1.4s linear infinite;
 }
 
@@ -39,39 +145,67 @@
 }
 
 body {
-  @apply bg-cream text-ink font-sans antialiased;
+  @apply bg-vg-black text-vg-white font-sans antialiased;
   text-rendering: optimizeLegibility;
 }
 
 ::selection {
-  background: rgb(184 145 47 / 0.25);
+  background: var(--vg-orange-red);
+  color: var(--vg-white);
 }
 
-/* Gold focus ring everywhere */
+/* Accent focus ring on every interactive element, per the brand spec. */
 :focus-visible {
-  outline: 2px solid #b8912f;
+  outline: 2px solid var(--vg-orange-red);
   outline-offset: 2px;
   border-radius: 4px;
 }
 
-/* Skeleton base + soft gold shimmer (never generic grey).
-   In @layer components so Tailwind utilities can still override them. */
 @layer components {
+  /* The app background: near-black with one soft grey bloom, top-left.
+     Deliberately *not* applied to cards, tables or the receipt — a
+     gradient behind dense text is a legibility tax for decoration. */
+  .app-bg {
+    background-color: var(--vg-black);
+    background-image: radial-gradient(
+      120% 80% at 12% 0%,
+      color-mix(in srgb, var(--vg-surface-3) 55%, transparent) 0%,
+      transparent 60%
+    );
+  }
+
+  /* Loading placeholder — accent on a surface-3 track. */
   .skeleton {
-    background-color: #f2ead7;
+    background-color: var(--vg-surface-3);
     border-radius: 8px;
   }
 
-  .gold-shimmer {
+  .accent-shimmer {
     background-image: linear-gradient(
       90deg,
-      rgb(217 180 92 / 0) 0%,
-      rgb(217 180 92 / 0.3) 50%,
-      rgb(217 180 92 / 0) 100%
+      color-mix(in srgb, var(--vg-orange-red) 0%, transparent) 0%,
+      color-mix(in srgb, var(--vg-orange-red) 28%, transparent) 50%,
+      color-mix(in srgb, var(--vg-orange-red) 0%, transparent) 100%
     );
     background-size: 200% 100%;
     animation: shimmer 1.4s linear infinite;
   }
+
+  /* Scrollbars, so the dark chrome doesn't sprout a light OS scrollbar
+     mid-panel. */
+  * {
+    scrollbar-color: var(--vg-surface-3) transparent;
+  }
+}
+
+/* Input focus: accent border plus a soft accent glow at 20%.
+   Declared with `@utility` rather than inside `@layer components` so that
+   `focus:control-focus` resolves — a plain component class is invisible to
+   Tailwind's variant engine, and inputs that also carry `focus:outline-none`
+   would otherwise have no focus indicator at all. */
+@utility control-focus {
+  border-color: var(--vg-orange-red);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--vg-orange-red) 20%, transparent);
 }
 
 /* Quiet number inputs (qty / price / discount) */
@@ -100,76 +234,118 @@ input[type="color"]::-webkit-color-swatch {
   border-radius: 8px;
 }
 
-/* ---- Print: the paper copy is a monochrome, printer-friendly document ----
-   The on-screen receipt (and the API's exported PDF) carries the full brand
-   treatment. A physical receipt is a different medium: ink costs money, most
-   office printers are monochrome anyway, and a pale brand colour behind dark
-   text is exactly what turns illegible when the background is dropped.
+/* ---- Motion ----
+   Nothing here animates for meaning, so opting out costs no
+   information — the shimmer becomes a static placeholder and the
+   spinners stop. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  .skeleton,
+  .accent-shimmer {
+    animation: none !important;
+    background-image: none !important;
+  }
+}
 
-   So the bands become rules, the tinted strips become white, and every piece
-   of text goes to black — with one deliberate exception: the organization's
-   logo keeps its own colours, which §14 explicitly allows, so a customer can
-   still recognize the issuer at a glance. */
+/* ============================================================
+   PRINT / PDF
+   ------------------------------------------------------------
+   The receipt is a document, not a screen. Ink costs money, most
+   office printers are monochrome, and a pale brand colour behind
+   dark text is exactly what turns illegible once the background is
+   dropped.
+
+   So the page goes to white, every band becomes a rule, tinted
+   strips become white, and all text goes black — with brand red
+   kept for exactly four things that survive a mono printer as a
+   *darker* ink: the header rule, the total rule, the footer rule,
+   and the logo. The QR stays pure black on white so it scans.
+   ============================================================ */
 @media print {
   body {
-    background: #ffffff;
+    background: var(--vg-print-bg) !important;
+    color: var(--vg-print-ink) !important;
   }
+
   .no-print {
     display: none !important;
   }
+
+  /* Kill the app-background bloom — it would print as a grey wash. */
+  .app-bg {
+    background: var(--vg-print-bg) !important;
+    background-image: none !important;
+  }
+
+  /* The dark frame the paper sits in on screen. It has to disappear on
+     paper, or the receipt prints as a grey card with a white slip on it. */
+  .receipt-frame {
+    background: transparent !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    padding: 0 !important;
+  }
+
   .receipt-document {
     border: 0 !important;
     border-radius: 0 !important;
     box-shadow: none !important;
     max-width: none !important;
     margin: 0 !important;
-    background: #ffffff !important;
-    color: #111111 !important;
+    background: var(--vg-print-bg) !important;
+    color: var(--vg-print-ink) !important;
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
   }
+
   /* The QR is already black on white — pin it so nothing tints it later. */
   .receipt-document .doc-qr,
   .receipt-document .doc-qr * {
-    background: #ffffff !important;
-    color: #111111 !important;
-    -webkit-print-color-adjust: exact !important;
-    print-color-adjust: exact !important;
+    background: var(--vg-print-bg) !important;
+    color: var(--vg-print-ink) !important;
   }
+
   .receipt-document .doc-band,
   .receipt-document .doc-band * {
     background: transparent !important;
-    color: #111111 !important;
+    color: var(--vg-print-ink) !important;
   }
   .receipt-document .doc-band {
-    border-bottom: 2px solid #111111 !important;
+    border-bottom: 2px solid var(--vg-print-rule) !important;
     padding-top: 0 !important;
   }
   .receipt-document .doc-meta {
-    background: #ffffff !important;
-    border-bottom: 1px solid #999999 !important;
+    background: var(--vg-print-bg) !important;
+    border-bottom: 1px solid var(--vg-print-ink) !important;
   }
   .receipt-document .doc-meta * {
-    color: #111111 !important;
+    color: var(--vg-print-ink) !important;
   }
   .receipt-document .doc-table-head {
-    background: #ffffff !important;
-    border-bottom: 2px solid #111111 !important;
+    background: var(--vg-print-bg) !important;
+    border-bottom: 2px solid var(--vg-print-ink) !important;
   }
   .receipt-document .doc-table-head * {
-    color: #111111 !important;
+    color: var(--vg-print-ink) !important;
   }
   .receipt-document .doc-total {
-    background: #ffffff !important;
-    border: 2px solid #111111 !important;
-    color: #111111 !important;
+    background: var(--vg-print-bg) !important;
+    border: 2px solid var(--vg-print-rule) !important;
+    color: var(--vg-print-ink) !important;
   }
   .receipt-document .doc-total * {
-    color: #111111 !important;
+    color: var(--vg-print-rule) !important;
   }
   /* Rules, dividers and tints all flatten to hairlines. */
   .receipt-document .doc-footer {
-    border-top-color: #111111 !important;
+    border-top: 1px solid var(--vg-print-rule) !important;
   }
   main {
     padding: 0 !important;

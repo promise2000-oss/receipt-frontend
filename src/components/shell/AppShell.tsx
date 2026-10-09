@@ -12,8 +12,8 @@ import { useSession } from "@/components/auth/SessionProvider";
 const PUBLIC_PATHS = ["/login", "/signup"];
 
 /**
- * App chrome: black top bar + black sidebar (lg+) / bottom nav (mobile).
- * The page body always sits on warm cream.
+ * App chrome: near-black top bar + near-black sidebar (lg+) / bottom nav
+ * (mobile) over the `#050505` app background.
  *
  * Also the auth gate — every route except /login and /signup requires a
  * signed-in organization, so we hold the splash until the session is known
@@ -42,13 +42,13 @@ export function AppShell({ children }: { children: ReactNode }) {
   /* ---- Gate: no flash of app chrome before we know the session ---- */
   if (status === "loading") {
     return (
-      <div className="flex min-h-dvh flex-col items-center justify-center gap-5 bg-cream">
-        <Logo variant="on-light" />
+      <div className="app-bg flex min-h-dvh flex-col items-center justify-center gap-5">
+        <Logo />
         <span
-          className="h-1.5 w-24 overflow-hidden rounded-full bg-brand-gold/15"
+          className="h-1.5 w-24 overflow-hidden rounded-full bg-vg-surface-3"
           aria-hidden
         >
-          <span className="gold-shimmer block h-full w-full" />
+          <span className="accent-shimmer block h-full w-full" />
         </span>
         <span className="sr-only" role="status">
           Loading your workspace…
@@ -59,7 +59,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   if (status === "unauthenticated") {
     return (
-      <div className="flex min-h-dvh items-center justify-center bg-cream">
+      <div className="app-bg flex min-h-dvh items-center justify-center">
         <span className="sr-only" role="status">
           Redirecting to sign in…
         </span>
@@ -68,7 +68,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   }
 
   return (
-    <div className="flex min-h-dvh flex-col">
+    <div className="app-bg flex min-h-dvh flex-col">
       <TopBar />
       <div className="flex flex-1 items-stretch">
         <Sidebar />

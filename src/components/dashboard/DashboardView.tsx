@@ -95,7 +95,7 @@ export function DashboardView() {
     <>
       {header}
 
-      {/* ---- Stat cards: black cards, gold numbers ---- */}
+      {/* ---- Stat cards: large white figure, muted label, accent icon ---- */}
       <div className="grid gap-4 sm:grid-cols-3">
         {summary
           ? STAT_BLOCKS.map(({ key, label, icon: Icon }) => {
@@ -103,18 +103,22 @@ export function DashboardView() {
               return (
                 <div
                   key={key}
-                  className="rounded-card border border-brand-gold/25 bg-brand-black p-5 sm:p-6"
+                  className="rounded-card border border-vg-border bg-vg-surface-2 p-5 transition-colors hover:border-vg-red-900 sm:p-6"
                 >
                   <div className="flex items-center justify-between">
-                    <span className="text-[10.5px] font-medium uppercase tracking-[0.2em] text-cream/55">
+                    <span className="text-[10.5px] font-medium uppercase tracking-[0.2em] text-vg-text-muted">
                       {label}
                     </span>
-                    <Icon className="h-4 w-4 text-brand-gold" strokeWidth={1.8} />
+                    <Icon
+                      className="h-4 w-4 text-vg-orange-red"
+                      strokeWidth={1.8}
+                      aria-hidden
+                    />
                   </div>
-                  <div className="mt-4 text-[26px] font-semibold leading-none tabular-nums text-brand-gold sm:text-[30px]">
+                  <div className="mt-4 text-[26px] font-semibold leading-none tabular-nums text-vg-white sm:text-[30px]">
                     {formatMoney(block.total)}
                   </div>
-                  <div className="mt-2.5 text-xs text-cream/50">
+                  <div className="mt-2.5 text-xs text-vg-text-muted">
                     {block.count} receipt{block.count === 1 ? "" : "s"} issued
                   </div>
                 </div>
@@ -137,7 +141,7 @@ export function DashboardView() {
         {!summary ? (
           <TableSkeleton rows={4} />
         ) : summary.recent.length === 0 ? (
-          <div className="px-6 py-10 text-center text-sm text-muted">
+          <div className="px-6 py-10 text-center text-sm text-vg-text-muted">
             No receipts yet — issue your first one to see it here.
           </div>
         ) : (

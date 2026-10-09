@@ -13,7 +13,7 @@ export interface NavItem {
   /** Short label for the mobile bottom nav */
   shortLabel: string;
   icon: LucideIcon;
-  /** Gold primary CTA (New Receipt) */
+  /** Primary CTA (New Receipt) — rendered as a filled brand-red disc */
   cta?: boolean;
   isActive: (pathname: string) => boolean;
 }

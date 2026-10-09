@@ -63,9 +63,9 @@ export function ShareBar({
 
       <Button variant="ghost" onClick={copyLink} disabled={!shareUrl}>
         {copied ? (
-          <Check className="h-4 w-4 text-brand-gold" strokeWidth={2.2} />
+          <Check className="h-4 w-4 text-vg-success" strokeWidth={2.2} aria-hidden />
         ) : (
-          <Copy className="h-4 w-4" strokeWidth={1.9} />
+          <Copy className="h-4 w-4" strokeWidth={1.9} aria-hidden />
         )}
         {copied ? "Link copied" : "Copy link"}
       </Button>

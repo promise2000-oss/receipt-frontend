@@ -18,8 +18,11 @@ interface SegmentedControlProps<T extends string> {
 }
 
 /**
- * Pill chip selector — active chip is black with gold text,
- * inactive chips are thin gold outlines.
+ * Pill chip selector — the selected chip takes the brand red fill with
+ * white text; the rest are hairline outlines in muted grey.
+ *
+ * `aria-checked` already carries the selection to assistive tech, so the
+ * state is never signalled by colour alone.
  */
 export function SegmentedControl<T extends string>({
   options,
@@ -45,10 +48,10 @@ export function SegmentedControl<T extends string>({
             aria-checked={active}
             onClick={() => onChange(option.value)}
             className={cn(
-              "inline-flex h-10 items-center gap-2 rounded-full border px-4 text-sm font-medium transition-colors",
+              "inline-flex h-11 items-center gap-2 rounded-full border px-4 text-sm font-medium transition-colors",
               active
-                ? "border-brand-black bg-brand-black text-brand-gold"
-                : "border-brand-gold/30 bg-transparent text-muted hover:border-brand-gold hover:text-ink",
+                ? "border-vg-red-900 bg-vg-red-900 text-vg-white"
+                : "border-vg-border bg-transparent text-vg-text-muted hover:border-vg-surface-3 hover:bg-vg-surface-3 hover:text-vg-white",
             )}
           >
             {Icon && <Icon className="h-4 w-4" strokeWidth={1.8} />}

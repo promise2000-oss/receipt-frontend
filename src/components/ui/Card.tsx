@@ -1,10 +1,15 @@
 import type { ReactNode } from "react";
 import { cn } from "@/lib/cn";
 
-/** Flat surface card — thin gold hairlines, never heavy shadows. */
+/** Panel on the raised surface — 1px border, 12px radius, no glow. */
 export function Card({ className, children }: { className?: string; children: ReactNode }) {
   return (
-    <section className={cn("rounded-card border border-brand-gold/20 bg-surface", className)}>
+    <section
+      className={cn(
+        "rounded-card border border-vg-border bg-vg-surface-2",
+        className,
+      )}
+    >
       {children}
     </section>
   );
@@ -24,13 +29,17 @@ export function CardHeader({
   return (
     <div
       className={cn(
-        "flex flex-wrap items-center justify-between gap-3 border-b border-brand-gold/15 px-5 py-4 sm:px-6",
+        "flex flex-wrap items-center justify-between gap-3 border-b border-vg-border px-5 py-4 sm:px-6",
         className,
       )}
     >
       <div className="min-w-0">
-        <h2 className="text-[15px] font-semibold tracking-tight text-ink">{title}</h2>
-        {description && <p className="mt-0.5 text-sm text-muted">{description}</p>}
+        <h2 className="text-[15px] font-semibold tracking-tight text-vg-white">
+          {title}
+        </h2>
+        {description && (
+          <p className="mt-0.5 text-sm text-vg-text-muted">{description}</p>
+        )}
       </div>
       {action}
     </div>
@@ -51,7 +60,9 @@ export function CardBody({
   );
 }
 
-/** Thin gold rule used instead of heavy borders. */
-export function GoldRule({ className }: { className?: string }) {
-  return <div className={cn("h-px w-full bg-brand-gold/25", className)} aria-hidden />;
+/** Hairline divider in the brand border colour. */
+export function Hairline({ className }: { className?: string }) {
+  return (
+    <div className={cn("h-px w-full bg-vg-border", className)} aria-hidden />
+  );
 }

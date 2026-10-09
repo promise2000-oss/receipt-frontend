@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Ban, CopyPlus } from "lucide-react";
+import { AlertCircle, ArrowLeft, Ban, CopyPlus } from "lucide-react";
 import { api } from "@/lib/api";
 import { formatDateTime } from "@/lib/format";
 import type { Receipt } from "@/lib/types";
@@ -135,9 +135,9 @@ export function ReceiptPreview({ id }: { id: string }) {
       <div className="no-print mb-5 flex flex-wrap items-center justify-between gap-3">
         <Link
           href="/receipts"
-          className="inline-flex items-center gap-2 text-sm text-muted transition-colors hover:text-ink"
+          className="inline-flex items-center gap-2 text-sm text-vg-text-muted transition-colors hover:text-vg-accent-text"
         >
-          <ArrowLeft className="h-4 w-4" strokeWidth={2} />
+          <ArrowLeft className="h-4 w-4" strokeWidth={2} aria-hidden />
           All receipts
         </Link>
 
@@ -149,12 +149,12 @@ export function ReceiptPreview({ id }: { id: string }) {
               router.push(`/receipts/new?duplicate=${receipt!.receipt_number}`)
             }
           >
-            <CopyPlus className="h-4 w-4" strokeWidth={1.9} />
+            <CopyPlus className="h-4 w-4" strokeWidth={1.9} aria-hidden />
             Duplicate
           </Button>
           {!isVoid && (
             <Button variant="danger" size="sm" onClick={() => setVoidOpen(true)}>
-              <Ban className="h-4 w-4" strokeWidth={1.9} />
+              <Ban className="h-4 w-4" strokeWidth={1.9} aria-hidden />
               Void receipt
             </Button>
           )}
@@ -163,29 +163,34 @@ export function ReceiptPreview({ id }: { id: string }) {
 
       {/* ---- Title ---- */}
       <div className="no-print mb-5">
-        <h1 className="text-2xl font-semibold tracking-tight text-ink">
+        <h1 className="text-2xl font-semibold tracking-tight text-vg-white">
           Receipt {receipt.receipt_number}
         </h1>
-        <p className="mt-1.5 text-sm text-muted">
+        <p className="mt-1.5 text-sm text-vg-text-muted">
           Issued {formatDateTime(receipt.issue_date)} · {receipt.customer_name}
         </p>
       </div>
 
       {/* ---- Void notice ---- */}
       {isVoid && (
-        <div className="no-print mb-5 rounded-card border border-muted/35 bg-muted/10 px-5 py-4">
-          <p className="text-sm font-medium text-ink">This receipt has been voided</p>
-          {receipt.void_note && (
-            <p className="mt-1 text-sm leading-relaxed text-muted">
-              “{receipt.void_note}”
+        <div className="no-print mb-5 flex items-start gap-3 rounded-card border border-vg-red-900 bg-vg-red-900/12 px-5 py-4">
+          <Ban className="mt-0.5 h-5 w-5 shrink-0 text-vg-white" strokeWidth={2} aria-hidden />
+          <div>
+            <p className="text-sm font-semibold text-vg-white">
+              This receipt has been voided
             </p>
-          )}
-          {receipt.voided_at && (
-            <p className="mt-1.5 text-xs text-muted">
-              Voided {formatDateTime(receipt.voided_at)} · issue a replacement with
-              Duplicate.
-            </p>
-          )}
+            {receipt.void_note && (
+              <p className="mt-1 text-sm leading-relaxed text-vg-text-muted">
+                “{receipt.void_note}”
+              </p>
+            )}
+            {receipt.voided_at && (
+              <p className="mt-1.5 text-xs text-vg-text-muted">
+                Voided {formatDateTime(receipt.voided_at)} · issue a replacement with
+                Duplicate.
+              </p>
+            )}
+          </div>
         </div>
       )}
 
@@ -208,6 +213,7 @@ export function ReceiptPreview({ id }: { id: string }) {
       {/* ---- Void confirmation ---- */}
       <ConfirmDialog
         open={voidOpen}
+        danger
         title="Void this receipt?"
         description="Voiding can't be undone. The receipt stays in your history — struck through — and the audit note explains why. To correct a sale, void then reissue."
         confirmLabel="Void receipt"
@@ -222,7 +228,7 @@ export function ReceiptPreview({ id }: { id: string }) {
         }}
       >
         <label className="block">
-          <span className="mb-1.5 block text-[13px] font-medium text-ink">
+          <span className="mb-1.5 block text-[13px] font-medium text-vg-white">
             Reason (required)
           </span>
           <TextArea
@@ -233,13 +239,18 @@ export function ReceiptPreview({ id }: { id: string }) {
           />
         </label>
         {voidError && (
-          <p className="mt-2 rounded-control border border-brand-gold/30 bg-brand-gold/10 px-3 py-2 text-xs text-gold-deep">
-            {voidError}
+          <p
+            role="alert"
+            className="mt-2 flex items-start gap-1.5 rounded-control border border-vg-error bg-vg-error/12 px-3 py-2 text-xs text-vg-error"
+          >
+            <AlertCircle className="mt-px h-3.5 w-3.5 shrink-0" aria-hidden />
+            <span>{voidError}</span>
           </p>
         )}
         {noteTouched && noteTooShort && (
-          <p className="mt-1.5 text-xs text-gold-deep">
-            Add a short audit note (at least a few words).
+          <p className="mt-1.5 flex items-start gap-1.5 text-xs text-vg-error">
+            <AlertCircle className="mt-px h-3.5 w-3.5 shrink-0" aria-hidden />
+            <span>Add a short audit note (at least a few words).</span>
           </p>
         )}
       </ConfirmDialog>

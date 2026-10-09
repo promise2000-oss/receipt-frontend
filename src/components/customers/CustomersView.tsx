@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
+  AlertCircle,
   ChevronRight,
   Mail,
   Phone,
@@ -174,7 +175,7 @@ export function CustomersView() {
       {/* Search */}
       <div className="relative mb-5 w-full sm:max-w-xs">
         <Search
-          className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-brand-gold"
+          className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-vg-text-muted"
           strokeWidth={2}
         />
         <input
@@ -183,7 +184,7 @@ export function CustomersView() {
           onChange={(event) => setQuery(event.target.value)}
           placeholder="Search customers…"
           aria-label="Search customers"
-          className="h-11 w-full rounded-control border border-brand-gold/25 bg-white pl-10 pr-4 text-[15px] text-ink transition-colors placeholder:text-muted/55 focus:border-brand-gold"
+          className="h-11 w-full rounded-control border border-vg-border bg-vg-surface-2 pl-10 pr-4 text-[15px] text-vg-white transition-colors placeholder:text-vg-placeholder focus:control-focus focus:outline-none"
         />
       </div>
 
@@ -225,33 +226,33 @@ export function CustomersView() {
                   key={customer.id}
                   type="button"
                   onClick={() => setSelected(customer)}
-                  className="flex w-full items-center gap-4 border-b border-brand-gold/10 px-5 py-4 text-left transition-colors last:border-b-0 hover:bg-brand-gold/[0.06] focus-visible:bg-brand-gold/[0.06]"
+                  className="flex w-full items-center gap-4 border-b border-vg-border px-5 py-4 text-left transition-colors last:border-b-0 hover:bg-vg-row-hover focus-visible:bg-vg-row-hover"
                 >
                   <span
-                    className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-brand-black text-sm font-semibold text-brand-gold"
+                    className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-vg-red-900 text-sm font-semibold text-vg-white"
                     aria-hidden
                   >
                     {initials(customer.name)}
                   </span>
                   <span className="min-w-0 flex-1">
-                    <span className="block truncate text-[15px] font-medium text-ink">
+                    <span className="block truncate text-[15px] font-medium text-vg-white">
                       {customer.name}
                     </span>
-                    <span className="mt-0.5 block truncate text-sm text-muted">
+                    <span className="mt-0.5 block truncate text-sm text-vg-text-muted">
                       {[customer.phone, customer.email].filter(Boolean).join(" · ") ||
                         "No contact details"}
                     </span>
                   </span>
                   <span className="hidden text-right sm:block">
-                    <span className="block text-sm font-semibold tabular-nums text-ink">
+                    <span className="block text-sm font-semibold tabular-nums text-vg-white">
                       {formatMoney(stats.total, business?.currency ?? "NGN")}
                     </span>
-                    <span className="mt-0.5 block text-xs text-muted">
+                    <span className="mt-0.5 block text-xs text-vg-text-muted">
                       {stats.count} receipt{stats.count === 1 ? "" : "s"}
                     </span>
                   </span>
                   <ChevronRight
-                    className="h-4 w-4 shrink-0 text-muted"
+                    className="h-4 w-4 shrink-0 text-vg-text-muted"
                     strokeWidth={2}
                     aria-hidden
                   />
@@ -269,29 +270,30 @@ export function CustomersView() {
             type="button"
             aria-label="Close customer details"
             onClick={() => setSelected(null)}
-            className="absolute inset-0 h-full w-full cursor-default bg-brand-black/45"
+            className="absolute inset-0 h-full w-full cursor-default"
+            style={{ backgroundColor: "var(--vg-overlay)" }}
           />
-          <aside className="absolute inset-y-0 right-0 flex w-full max-w-md flex-col overflow-y-auto border-l border-brand-gold/25 bg-cream">
-            <div className="sticky top-0 flex items-start justify-between gap-4 border-b border-brand-gold/15 bg-cream px-6 py-5">
+          <aside className="absolute inset-y-0 right-0 flex w-full max-w-md flex-col overflow-y-auto border-l border-vg-border bg-vg-surface-1">
+            <div className="sticky top-0 flex items-start justify-between gap-4 border-b border-vg-border bg-vg-surface-1 px-6 py-5">
               <div className="flex items-center gap-4">
                 <span
-                  className="grid h-12 w-12 place-items-center rounded-full bg-brand-black text-base font-semibold text-brand-gold"
+                  className="grid h-12 w-12 place-items-center rounded-full bg-vg-red-900 text-base font-semibold text-vg-white"
                   aria-hidden
                 >
                   {initials(selected.name)}
                 </span>
                 <div>
-                  <h2 className="text-lg font-semibold tracking-tight text-ink">
+                  <h2 className="text-lg font-semibold tracking-tight text-vg-white">
                     {selected.name}
                   </h2>
-                  <p className="mt-0.5 text-xs text-muted">Customer details</p>
+                  <p className="mt-0.5 text-xs text-vg-text-muted">Customer details</p>
                 </div>
               </div>
               <button
                 type="button"
                 onClick={() => setSelected(null)}
                 aria-label="Close"
-                className="grid h-9 w-9 place-items-center rounded-full text-muted transition-colors hover:bg-brand-gold/10 hover:text-ink"
+                className="grid h-9 w-9 place-items-center rounded-full text-vg-text-muted transition-colors hover:bg-vg-surface-3 hover:text-vg-white"
               >
                 <X className="h-4 w-4" strokeWidth={2} />
               </button>
@@ -301,38 +303,38 @@ export function CustomersView() {
               {/* Contact */}
               <div className="space-y-3">
                 {selected.phone && (
-                  <div className="flex items-center gap-3 text-sm text-ink">
-                    <Phone className="h-4 w-4 text-brand-gold" strokeWidth={1.8} />
+                  <div className="flex items-center gap-3 text-sm text-vg-white">
+                    <Phone className="h-4 w-4 text-vg-orange-red" strokeWidth={1.8} />
                     {selected.phone}
                   </div>
                 )}
                 {selected.email && (
-                  <div className="flex items-center gap-3 text-sm text-ink">
-                    <Mail className="h-4 w-4 text-brand-gold" strokeWidth={1.8} />
+                  <div className="flex items-center gap-3 text-sm text-vg-white">
+                    <Mail className="h-4 w-4 text-vg-orange-red" strokeWidth={1.8} />
                     {selected.email}
                   </div>
                 )}
                 {!selected.phone && !selected.email && (
-                  <p className="text-sm text-muted">No contact details on file.</p>
+                  <p className="text-sm text-vg-text-muted">No contact details on file.</p>
                 )}
               </div>
 
               {/* Stats */}
               {selectedStats && (
                 <div className="mt-5 grid grid-cols-2 gap-3">
-                  <div className="rounded-card border border-brand-gold/25 bg-brand-black p-4">
-                    <div className="text-[10px] uppercase tracking-[0.18em] text-cream/55">
+                  <div className="rounded-card border border-vg-border bg-vg-surface-2 p-4">
+                    <div className="text-[10px] uppercase tracking-[0.18em] text-vg-text-muted">
                       Receipts
                     </div>
-                    <div className="mt-2 text-xl font-semibold text-brand-gold">
+                    <div className="mt-2 text-xl font-semibold text-vg-white">
                       {selectedStats.count}
                     </div>
                   </div>
-                  <div className="rounded-card border border-brand-gold/25 bg-brand-black p-4">
-                    <div className="text-[10px] uppercase tracking-[0.18em] text-cream/55">
+                  <div className="rounded-card border border-vg-border bg-vg-surface-2 p-4">
+                    <div className="text-[10px] uppercase tracking-[0.18em] text-vg-text-muted">
                       Lifetime
                     </div>
-                    <div className="mt-2 truncate text-xl font-semibold text-brand-gold">
+                    <div className="mt-2 truncate text-xl font-semibold text-vg-white">
                       {formatMoney(selectedStats.total, business?.currency ?? "NGN")}
                     </div>
                   </div>
@@ -340,12 +342,12 @@ export function CustomersView() {
               )}
 
               {/* Their receipts */}
-              <h3 className="mt-6 text-[11px] font-semibold uppercase tracking-[0.18em] text-muted">
+              <h3 className="mt-6 text-[11px] font-semibold uppercase tracking-[0.18em] text-vg-text-muted">
                 Receipts
               </h3>
               <div className="mt-3 space-y-2">
                 {selectedReceipts.length === 0 ? (
-                  <p className="text-sm text-muted">No receipts yet.</p>
+                  <p className="text-sm text-vg-text-muted">No receipts yet.</p>
                 ) : (
                   selectedReceipts.map((receipt) => (
                     <button
@@ -354,19 +356,19 @@ export function CustomersView() {
                       onClick={() => {
                         router.push(`/receipts/${receipt.receipt_number}`);
                       }}
-                      className="flex w-full items-center justify-between gap-3 rounded-control border border-brand-gold/15 bg-surface px-4 py-3 text-left transition-colors hover:border-brand-gold/40 hover:bg-brand-gold/[0.06]"
+                      className="flex w-full items-center justify-between gap-3 rounded-control border border-vg-border bg-vg-surface-2 px-4 py-3 text-left transition-colors hover:border-vg-red-900 hover:bg-vg-row-hover"
                     >
                       <span className="min-w-0">
-                        <span className="block text-sm font-medium tabular-nums text-ink">
+                        <span className="block text-sm font-medium tabular-nums text-vg-white">
                           {receipt.receipt_number}
                         </span>
-                        <span className="mt-0.5 block text-xs text-muted">
+                        <span className="mt-0.5 block text-xs text-vg-text-muted">
                           {formatDate(receipt.issue_date)}
                         </span>
                       </span>
                       <span className="flex shrink-0 items-center gap-3">
                         <span
-                          className={`text-sm font-semibold tabular-nums text-ink ${
+                          className={`text-sm font-semibold tabular-nums text-vg-white ${
                             receipt.status === "void" ? "line-through" : ""
                           }`}
                         >
@@ -386,7 +388,7 @@ export function CustomersView() {
               </div>
             </div>
 
-            <div className="sticky bottom-0 border-t border-brand-gold/15 bg-cream px-6 py-4">
+            <div className="sticky bottom-0 border-t border-vg-border bg-vg-surface-1 px-6 py-4">
               <ButtonLink
                 href={`/receipts/new?customer=${selected.id}`}
                 className="w-full"
@@ -419,9 +421,10 @@ export function CustomersView() {
         {saveError && (
           <p
             role="alert"
-            className="mb-4 text-sm leading-relaxed text-gold-deep"
+            className="mb-4 flex items-start gap-2 rounded-control border border-vg-error bg-vg-error/12 px-3 py-2.5 text-sm leading-relaxed text-vg-error"
           >
-            {saveError}
+            <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
+            <span>{saveError}</span>
           </p>
         )}
         <div className="space-y-3">
@@ -450,7 +453,10 @@ export function CustomersView() {
             />
           </Field>
           {saveTouched && newName.trim().length < 2 && (
-            <p className="text-xs text-gold-deep">Please enter the customer’s name.</p>
+            <p className="flex items-center gap-1.5 text-xs text-vg-error">
+              <AlertCircle className="h-3.5 w-3.5 shrink-0" aria-hidden />
+              Please enter the customer’s name.
+            </p>
           )}
         </div>
       </ConfirmDialog>

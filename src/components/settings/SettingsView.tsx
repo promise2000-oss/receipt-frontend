@@ -2,7 +2,7 @@
 
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Check, ImageUp, LogOut, RotateCcw } from "lucide-react";
+import { AlertCircle, Check, ImageUp, LogOut, RotateCcw } from "lucide-react";
 import { api } from "@/lib/api";
 import { useSession } from "@/components/auth/SessionProvider";
 import { invalidateOrgName } from "@/lib/server/brand-actions";
@@ -22,8 +22,17 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { cn } from "@/lib/cn";
 
 const HEX = /^#([0-9a-f]{6})$/i;
+/**
+ * Defaults for a brand-new organization.
+ *
+ * The band stays near-black rather than taking brand red: `safeAccent()`
+ * solves the accent *against* the band, and on a `#B71C1C` band the brand
+ * accent comes out washed to `#f4d0c3`. A dark band with a warm accent reads
+ * correctly and prints cleanly. The accent itself is the VisionaryGene
+ * orange-red, repaired to `#d75121` on that band.
+ */
 const DEFAULT_PRIMARY = "#111111";
-const DEFAULT_ACCENT = "#B8912F";
+const DEFAULT_ACCENT = "#D4430F";
 /** `POST /business/logo` rejects anything larger. */
 const MAX_LOGO_BYTES = 3 * 1024 * 1024;
 
@@ -81,17 +90,17 @@ function ColorField({
 }) {
   const valid = HEX.test(value);
   return (
-    <div className="rounded-control border border-brand-gold/15 bg-white/50 p-4">
+    <div className="rounded-control border border-vg-border bg-vg-surface-1 p-4">
       <div className="flex items-center gap-3">
         <input
           type="color"
           value={valid ? value : DEFAULT_PRIMARY}
           onChange={(event) => onChange(event.target.value)}
-          className="h-11 w-14 shrink-0 rounded-control border border-brand-gold/25"
+          className="h-11 w-14 shrink-0 rounded-control border border-vg-border"
           aria-label={`${label} colour picker`}
         />
         <div className="min-w-0 flex-1">
-          <span className="mb-1.5 block text-[13px] font-medium text-ink">
+          <span className="mb-1.5 block text-[13px] font-medium text-vg-white">
             {label}
           </span>
           <TextInput
@@ -110,9 +119,12 @@ function ColorField({
       </div>
       <p className="mt-2.5 text-xs">
         {valid ? (
-          <span className="text-muted">{hint}</span>
+          <span className="text-vg-text-muted">{hint}</span>
         ) : (
-          <span className="text-gold-deep">Enter a hex colour like #B8912F</span>
+          <span className="flex items-center gap-1.5 text-vg-error">
+            <AlertCircle className="h-3.5 w-3.5 shrink-0" aria-hidden />
+            Enter a hex colour like {DEFAULT_ACCENT}
+          </span>
         )}
       </p>
     </div>
@@ -139,7 +151,7 @@ function TemplatePreview({
 
   return (
     <div
-      className="overflow-hidden rounded-card border bg-cream"
+      className="overflow-hidden rounded-card border bg-vg-paper-bg"
       style={{ borderColor: tint(a, 35) }}
     >
       <div
@@ -155,7 +167,7 @@ function TemplatePreview({
               className="h-6 w-6 shrink-0 rounded-[6px] bg-white object-contain p-0.5"
             />
           ) : null}
-          <span className="truncate font-display text-[13px] uppercase tracking-[0.2em] text-white">
+          <span className="truncate text-[13px] font-semibold uppercase tracking-[0.2em] text-vg-white">
             {businessName || "Your Business"}
           </span>
         </span>
@@ -180,7 +192,7 @@ function TemplatePreview({
           style={{ backgroundColor: tint(p, 10) }}
         />
         <div className="flex items-center justify-between pt-2">
-          <span className="text-[10px] font-semibold uppercase tracking-[0.2em] text-muted">
+          <span className="text-[10px] font-semibold uppercase tracking-[0.2em] text-vg-paper-muted">
             Total
           </span>
           <span
@@ -448,7 +460,7 @@ export function SettingsView() {
             <CardBody>
               <div className="flex items-center gap-5">
                 <div
-                  className="grid h-24 w-24 shrink-0 place-items-center overflow-hidden rounded-card border border-brand-gold/30 bg-brand-black"
+                  className="grid h-24 w-24 shrink-0 place-items-center overflow-hidden rounded-card border border-vg-border bg-vg-surface-1"
                   aria-hidden={!logo}
                 >
                   {logo ? (
@@ -459,7 +471,7 @@ export function SettingsView() {
                       className="h-full w-full bg-white object-contain p-1"
                     />
                   ) : (
-                    <span className="font-display text-4xl text-brand-gold">
+                    <span className="text-4xl font-bold text-vg-accent-text">
                       {initials(name)}
                     </span>
                   )}
@@ -484,14 +496,14 @@ export function SettingsView() {
                       Remove
                     </Button>
                   )}
-                  <p className="pt-1 text-xs text-muted">
+                  <p className="pt-1 text-xs text-vg-text-muted">
                     PNG, JPG, WebP or SVG · recommended square, at least
                     256×256. 3 MB max.
                   </p>
                   <p
                     className={cn(
                       "pt-0.5 text-xs",
-                      logoStatus === "error" ? "text-gold-deep" : "text-brand-gold",
+                      logoStatus === "error" ? "text-vg-error" : "text-vg-success",
                     )}
                     role="status"
                   >
@@ -520,12 +532,12 @@ export function SettingsView() {
               />
               <ColorField
                 label="Accent"
-                hint="Used for totals, rules, and highlights — default is gold."
+                hint="Used for totals, rules, and highlights — default is the brand accent."
                 value={accent}
                 onChange={setAccent}
                 onReset={() => setAccent(DEFAULT_ACCENT)}
               />
-              <p className="text-xs text-muted">
+              <p className="text-xs text-vg-text-muted">
                 Uploading a logo suggests a pair of colours drawn from it; both
                 stay editable here. The accent is nudged if it would fall below
                 WCAG contrast against the primary, so the picker and the
@@ -560,10 +572,10 @@ export function SettingsView() {
           />
           <CardBody className="flex flex-wrap items-center justify-between gap-4">
             <div className="min-w-0">
-              <p className="text-[15px] font-medium text-ink">
+              <p className="text-[15px] font-medium text-vg-white">
                 {session?.org_name}
               </p>
-              <p className="mt-1 text-sm text-muted">
+              <p className="mt-1 text-sm text-vg-text-muted">
                 {session?.owner_name} · {session?.email}
               </p>
             </div>
@@ -577,14 +589,35 @@ export function SettingsView() {
         {/* ---- Save ---- */}
         <div
           className={cn(
-            "flex flex-wrap items-center justify-between gap-4 rounded-card border border-brand-gold/20 bg-surface px-5 py-4",
+            "flex flex-wrap items-center justify-between gap-4 rounded-card border border-vg-border bg-vg-surface-2 px-5 py-4",
           )}
         >
-          <p className={cn("text-sm", error ? "text-gold-deep" : "text-muted")}>
-            {error ??
-              (saved
-                ? "Saved — your receipts will use the updated branding."
-                : "Changes apply to receipts issued from now on.")}
+          {/* Save feedback — icon + wording, so the state never rests on the
+              colour of this line. */}
+          <p
+            role="status"
+            className={cn(
+              "flex items-start gap-2 text-sm",
+              error
+                ? "text-vg-error"
+                : saved
+                  ? "text-vg-success"
+                  : "text-vg-text-muted",
+            )}
+          >
+            {error ? (
+              <>
+                <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
+                <span>{error}</span>
+              </>
+            ) : saved ? (
+              <>
+                <Check className="mt-0.5 h-4 w-4 shrink-0" strokeWidth={2.4} aria-hidden />
+                <span>Saved — your receipts will use the updated branding.</span>
+              </>
+            ) : (
+              <span>Changes apply to receipts issued from now on.</span>
+            )}
           </p>
           <Button size="lg" onClick={save} disabled={saving}>
             {saving ? (

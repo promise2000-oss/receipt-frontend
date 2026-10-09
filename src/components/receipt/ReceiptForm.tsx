@@ -2,6 +2,7 @@
 
 import { useEffect, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
+import { AlertCircle } from "lucide-react";
 import {
   ArrowLeftRight,
   Banknote,
@@ -244,12 +245,12 @@ export function ReceiptForm({ duplicateOf, prefillCustomerId }: ReceiptFormProps
               />
               <CardBody>
                 {selected ? (
-                  <div className="flex items-center justify-between gap-3 rounded-control border border-brand-gold/30 bg-brand-gold/[0.07] px-4 py-3">
+                  <div className="flex items-center justify-between gap-3 rounded-control border border-vg-red-900 bg-vg-red-900/12 px-4 py-3">
                     <div className="min-w-0">
-                      <p className="truncate text-[15px] font-medium text-ink">
+                      <p className="truncate text-[15px] font-medium text-vg-white">
                         {selected.name}
                       </p>
-                      <p className="mt-0.5 truncate text-sm text-muted">
+                      <p className="mt-0.5 truncate text-sm text-vg-text-muted">
                         {[selected.phone, selected.email].filter(Boolean).join(" · ") ||
                           "No contact details"}
                       </p>
@@ -278,7 +279,7 @@ export function ReceiptForm({ duplicateOf, prefillCustomerId }: ReceiptFormProps
                       >
                         <div className="relative">
                           <Search
-                            className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-brand-gold"
+                            className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-vg-text-muted"
                             strokeWidth={2}
                           />
                           <TextInput
@@ -300,7 +301,7 @@ export function ReceiptForm({ duplicateOf, prefillCustomerId }: ReceiptFormProps
                       </Field>
 
                       {pickerOpen && matches.length > 0 && (
-                        <ul className="absolute left-0 right-0 top-full z-30 mt-1 max-h-60 overflow-y-auto rounded-control border border-brand-gold/25 bg-white py-1">
+                        <ul className="absolute left-0 right-0 top-full z-30 mt-1 max-h-60 overflow-y-auto rounded-control border border-vg-border bg-vg-surface-1 py-1">
                           {matches.map((customer) => (
                             <li key={customer.id}>
                               <button
@@ -316,12 +317,12 @@ export function ReceiptForm({ duplicateOf, prefillCustomerId }: ReceiptFormProps
                                   setQuery("");
                                   setPickerOpen(false);
                                 }}
-                                className="flex w-full items-center justify-between gap-3 px-4 py-2.5 text-left transition-colors hover:bg-brand-gold/10"
+                                className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left transition-colors hover:bg-vg-surface-2"
                               >
-                                <span className="text-sm font-medium text-ink">
+                                <span className="text-sm font-medium text-vg-white">
                                   {customer.name}
                                 </span>
-                                <span className="text-xs text-muted">
+                                <span className="text-xs text-vg-text-muted">
                                   {customer.phone}
                                 </span>
                               </button>
@@ -368,12 +369,12 @@ export function ReceiptForm({ duplicateOf, prefillCustomerId }: ReceiptFormProps
               />
               <CardBody>
                 {/* Desktop column labels */}
-                <div className="hidden gap-3 border-b border-brand-gold/15 pb-2.5 sm:grid sm:grid-cols-[1fr_84px_132px_132px_40px]">
+                <div className="hidden gap-3 border-b border-vg-border pb-2.5 sm:grid sm:grid-cols-[1fr_84px_132px_132px_40px]">
                   {["Description", "Qty", "Unit Price", "Line Total"].map(
                     (label, index) => (
                       <span
                         key={label}
-                        className={`text-[10px] font-semibold uppercase tracking-[0.16em] text-muted ${
+                        className={`text-[10px] font-semibold uppercase tracking-[0.16em] text-vg-text-muted ${
                           index >= 1 ? "text-right" : ""
                         }`}
                       >
@@ -398,7 +399,7 @@ export function ReceiptForm({ duplicateOf, prefillCustomerId }: ReceiptFormProps
                     return (
                       <div
                         key={row.key}
-                        className="grid gap-3 rounded-[10px] border border-brand-gold/15 bg-white/50 p-3 sm:border-0 sm:bg-transparent sm:p-0 sm:grid-cols-[1fr_84px_132px_132px_40px] sm:items-center"
+                        className="grid gap-3 rounded-control border border-vg-border bg-vg-surface-1 p-3 sm:border-0 sm:bg-transparent sm:p-0 sm:grid-cols-[1fr_84px_132px_132px_40px] sm:items-center"
                       >
                         {/* Description (+ mobile remove) */}
                         <div className="relative">
@@ -415,7 +416,7 @@ export function ReceiptForm({ duplicateOf, prefillCustomerId }: ReceiptFormProps
                             type="button"
                             onClick={() => removeRow(row.key)}
                             aria-label="Remove item"
-                            className="absolute right-2 top-1/2 grid h-7 w-7 -translate-y-1/2 place-items-center rounded-full text-muted transition-colors hover:bg-muted/10 hover:text-ink sm:hidden"
+                            className="absolute right-2 top-1/2 grid h-7 w-7 -translate-y-1/2 place-items-center rounded-full text-vg-text-muted transition-colors hover:bg-vg-surface-3 hover:text-vg-white sm:hidden"
                           >
                             <Trash2 className="h-4 w-4" strokeWidth={1.8} />
                           </button>
@@ -436,7 +437,7 @@ export function ReceiptForm({ duplicateOf, prefillCustomerId }: ReceiptFormProps
                             className="text-center sm:text-right"
                           />
                           <div className="relative">
-                            <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted">
+                            <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-vg-text-muted">
                               {currency === "NGN" ? "₦" : currency}
                             </span>
                             <TextInput
@@ -456,10 +457,10 @@ export function ReceiptForm({ duplicateOf, prefillCustomerId }: ReceiptFormProps
 
                         {/* Line total */}
                         <div className="flex items-center justify-between gap-2 sm:justify-end">
-                          <span className="text-[10px] font-semibold uppercase tracking-[0.16em] text-muted sm:hidden">
+                          <span className="text-[10px] font-semibold uppercase tracking-[0.16em] text-vg-text-muted sm:hidden">
                             Line total
                           </span>
-                          <span className="text-sm font-semibold tabular-nums text-gold-deep">
+                          <span className="text-sm font-semibold tabular-nums text-vg-accent-text">
                             {formatMoney(total, currency)}
                           </span>
                         </div>
@@ -470,14 +471,14 @@ export function ReceiptForm({ duplicateOf, prefillCustomerId }: ReceiptFormProps
                             type="button"
                             onClick={() => removeRow(row.key)}
                             aria-label="Remove item"
-                            className="grid h-9 w-9 place-items-center rounded-full text-muted transition-colors hover:bg-muted/10 hover:text-ink"
+                            className="grid h-9 w-9 place-items-center rounded-full text-vg-text-muted transition-colors hover:bg-vg-surface-3 hover:text-vg-white"
                           >
                             <Trash2 className="h-4 w-4" strokeWidth={1.8} />
                           </button>
                         </div>
 
                         {invalid && (
-                          <p className="text-xs text-gold-deep sm:col-span-5">
+                          <p className="text-xs text-vg-error sm:col-span-5">
                             Quantity must be at least 1 and price cannot be negative.
                           </p>
                         )}
@@ -497,7 +498,7 @@ export function ReceiptForm({ duplicateOf, prefillCustomerId }: ReceiptFormProps
               <CardBody>
                 <Field label="Discount" hint="Amount off the subtotal">
                   <div className="relative">
-                    <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted">
+                    <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-vg-text-muted">
                       {currency === "NGN" ? "₦" : currency}
                     </span>
                     <TextInput
@@ -523,7 +524,7 @@ export function ReceiptForm({ duplicateOf, prefillCustomerId }: ReceiptFormProps
               />
               <CardBody className="space-y-5">
                 <div>
-                  <p className="mb-2.5 text-[13px] font-medium text-ink">
+                  <p className="mb-2.5 text-[13px] font-medium text-vg-white">
                     Payment method
                   </p>
                   <SegmentedControl
@@ -534,7 +535,7 @@ export function ReceiptForm({ duplicateOf, prefillCustomerId }: ReceiptFormProps
                   />
                 </div>
                 <div>
-                  <p className="mb-2.5 text-[13px] font-medium text-ink">
+                  <p className="mb-2.5 text-[13px] font-medium text-vg-white">
                     Payment status
                   </p>
                   <SegmentedControl
@@ -571,38 +572,43 @@ export function ReceiptForm({ duplicateOf, prefillCustomerId }: ReceiptFormProps
                 <CardHeader title="Summary" />
                 <CardBody>
                   <dl className="space-y-2.5 text-sm">
-                    <div className="flex justify-between text-muted">
+                    <div className="flex justify-between text-vg-text-muted">
                       <dt>Subtotal</dt>
-                      <dd className="tabular-nums text-ink">
+                      <dd className="tabular-nums text-vg-white">
                         {formatMoney(totals.subtotal, currency)}
                       </dd>
                     </div>
-                    <div className="flex justify-between text-muted">
+                    <div className="flex justify-between text-vg-text-muted">
                       <dt>Discount</dt>
-                      <dd className="tabular-nums text-ink">
+                      <dd className="tabular-nums text-vg-white">
                         {totals.discount > 0 ? "− " : ""}
                         {formatMoney(totals.discount, currency)}
                       </dd>
                     </div>
                   </dl>
 
-                  <div className="mt-4 h-px w-full bg-brand-gold/40" />
+                  <div className="mt-4 h-px w-full bg-vg-border" />
 
                   <div className="mt-4 flex items-end justify-between gap-3">
-                    <span className="text-[11px] font-semibold uppercase tracking-[0.2em] text-ink">
+                    <span className="text-[11px] font-semibold uppercase tracking-[0.2em] text-vg-white">
                       Total
                     </span>
-                    <span className="text-[32px] font-semibold leading-none tabular-nums text-brand-gold">
+                    <span className="text-[32px] font-semibold leading-none tabular-nums text-vg-white">
                       {formatMoney(totals.total, currency)}
                     </span>
                   </div>
 
-                  <p className="mt-3 text-xs leading-relaxed text-muted">
+                  <p className="mt-3 text-xs leading-relaxed text-vg-text-muted">
                     {parsedItems.length} item{parsedItems.length === 1 ? "" : "s"}
                     {customerName ? ` · ${customerName}` : " · No customer yet"}
                   </p>
 
-                  {error && <p className="mt-3 text-xs text-gold-deep">{error}</p>}
+                  {error && (
+                    <p role="alert" className="mt-3 flex items-start gap-1.5 text-xs text-vg-error">
+                      <AlertCircle className="mt-px h-3.5 w-3.5 shrink-0" aria-hidden />
+                      <span>{error}</span>
+                    </p>
+                  )}
 
                   <Button
                     type="submit"
@@ -617,7 +623,7 @@ export function ReceiptForm({ duplicateOf, prefillCustomerId }: ReceiptFormProps
                         : "Issue Receipt"}
                   </Button>
 
-                  <p className="mt-3 text-center text-[11px] text-muted">
+                  <p className="mt-3 text-center text-[11px] text-vg-text-muted">
                     Issuing assigns a unique receipt number.
                   </p>
                 </CardBody>
@@ -628,7 +634,7 @@ export function ReceiptForm({ duplicateOf, prefillCustomerId }: ReceiptFormProps
 
         {/* ---- Mobile sticky action bar ---- */}
         <div
-          className="fixed inset-x-0 z-30 flex items-center justify-between gap-4 border-t border-brand-gold/20 bg-surface/95 px-4 backdrop-blur lg:hidden"
+          className="fixed inset-x-0 z-30 flex items-center justify-between gap-4 border-t border-vg-border bg-vg-surface-1/95 px-4 backdrop-blur lg:hidden"
           style={{
             bottom: "calc(4rem + env(safe-area-inset-bottom))",
             paddingTop: "0.75rem",
@@ -636,10 +642,10 @@ export function ReceiptForm({ duplicateOf, prefillCustomerId }: ReceiptFormProps
           }}
         >
           <div className="min-w-0">
-            <div className="text-[10px] font-semibold uppercase tracking-[0.2em] text-muted">
+            <div className="text-[10px] font-semibold uppercase tracking-[0.2em] text-vg-text-muted">
               Total
             </div>
-            <div className="mt-0.5 truncate text-xl font-semibold tabular-nums text-brand-gold">
+            <div className="mt-0.5 truncate text-xl font-semibold tabular-nums text-vg-white">
               {formatMoney(totals.total, currency)}
             </div>
           </div>

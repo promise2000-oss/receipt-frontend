@@ -2,32 +2,38 @@ import Link from "next/link";
 import type { ComponentPropsWithoutRef, ReactNode } from "react";
 import { cn } from "@/lib/cn";
 
-export type ButtonVariant = "primary" | "dark" | "outline" | "ghost" | "danger";
+export type ButtonVariant = "primary" | "outline" | "ghost" | "danger";
 export type ButtonSize = "sm" | "md" | "lg" | "icon";
 
 const VARIANTS: Record<ButtonVariant, string> = {
-  /* Primary action: solid gold + black text */
+  /* Primary action: brand red fill + white text (6.57:1). */
   primary:
-    "bg-brand-gold text-brand-black hover:bg-brand-gold-soft active:bg-brand-gold",
-  /* Secondary action: solid black + gold text */
-  dark: "bg-brand-black text-brand-gold hover:bg-[#1d1d1d]",
+    "bg-vg-red-900 text-vg-white hover:bg-vg-red-900-hover active:bg-vg-red-900-active",
+  /* Secondary: transparent with a brand red keyline. */
   outline:
-    "border border-brand-gold/40 bg-surface text-ink hover:border-brand-gold hover:bg-brand-gold/10",
-  ghost: "text-muted hover:bg-brand-gold/10 hover:text-ink",
-  /* Destructive — muted grey, never red (palette stays black/gold/cream) */
+    "border border-vg-red-900 bg-transparent text-vg-white hover:bg-vg-red-900/12",
+  /* Tertiary: no border, accent text. */
+  ghost:
+    "bg-transparent text-vg-accent-text hover:bg-vg-surface-3 hover:text-vg-white",
+  /* Destructive — deliberately *not* a red fill. A solid red button would
+     be indistinguishable from "Issue receipt" at a glance, so void/delete
+     is an outline in the brighter error red (5.77:1) and is always behind
+     a ConfirmDialog. */
   danger:
-    "border border-muted/40 bg-transparent text-muted hover:border-muted/60 hover:bg-muted/10 hover:text-ink",
+    "border border-vg-error bg-transparent text-vg-error hover:bg-vg-error/12",
 };
 
+/* Every size clears 44px so touch targets stay reachable; the steps
+   between them carry the hierarchy instead. */
 const SIZES: Record<ButtonSize, string> = {
-  sm: "h-9 px-3.5 text-sm gap-1.5",
-  md: "h-11 px-5 text-sm gap-2",
-  lg: "h-12 px-6 text-[15px] gap-2",
+  sm: "h-11 px-3.5 text-[13px] gap-1.5",
+  md: "h-12 px-5 text-sm gap-2",
+  lg: "h-13 px-6 text-[15px] gap-2",
   icon: "h-11 w-11",
 };
 
 const BASE =
-  "inline-flex select-none items-center justify-center rounded-control font-medium tracking-[0.02em] transition-colors duration-150 disabled:pointer-events-none disabled:opacity-50";
+  "inline-flex select-none items-center justify-center rounded-button font-medium tracking-[0.01em] transition-colors duration-150 disabled:pointer-events-none disabled:bg-vg-disabled-bg disabled:text-vg-disabled-text";
 
 function buttonClasses(
   variant: ButtonVariant,

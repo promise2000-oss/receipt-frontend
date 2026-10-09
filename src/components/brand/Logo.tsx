@@ -1,16 +1,44 @@
 "use client";
 
+import Image from "next/image";
 import { cn } from "@/lib/cn";
 import { initials } from "@/lib/brand";
 import { useSession } from "@/components/auth/SessionProvider";
 
+/**
+ * The VisionaryGene mark, extracted from the source artwork to
+ * `public/brand/mark.png`. Red ink on a transparent plate — the neuron lines
+ * are holes, not white, so the same file reads correctly on the near-black
+ * chrome and on any light surface without a second variant.
+ */
+const PLATFORM_MARK = "/brand/mark.png";
+
+/**
+ * The wordmark: VISIONARY in white, GENE in the brand accent.
+ *
+ * `#D4430F` on its own only reaches 4.04:1 on a card — under the 4.5:1 body
+ * bar — so "GENE" takes the accent-text token (`#DA5F33`, 4.97:1 there)
+ * while `#D4430F` stays reserved for fills, rules and the mark artwork.
+ */
+export function Wordmark({ className }: { className?: string }) {
+  return (
+    <span
+      className={cn(
+        "text-[15px] font-bold uppercase leading-none tracking-[0.16em] sm:text-[17px]",
+        className,
+      )}
+    >
+      <span className="text-vg-white">Visionary</span>
+      <span className="text-vg-accent-text">Gene</span>
+    </span>
+  );
+}
+
 interface LogoProps {
-  /** "on-dark" = black surfaces (top bar, sidebar) */
-  variant?: "on-dark" | "on-light";
   /** Platform attribution line — the organization is primary, VisionaryGene quiet. */
   showTagline?: boolean;
   className?: string;
-  /** Monogram only — used in tight spaces */
+  /** Mark only — used in tight spaces */
   compact?: boolean;
 }
 
@@ -23,23 +51,21 @@ interface LogoProps {
  * nobody is signed in (the loading splash, the sign-in page) it falls back to
  * the platform identity, because on those surfaces there is no organization
  * to show yet.
+ *
+ * The former `variant` prop went away with the light chrome: every surface
+ * this renders on is now the same dark family, so there was no longer a
+ * second treatment to select between.
  */
 export function Logo({
-  variant = "on-dark",
   showTagline = true,
   className,
   compact = false,
 }: LogoProps) {
   const { session } = useSession();
-  const isDark = variant === "on-dark";
 
   const business = session?.business;
   const name = business?.name?.trim();
   const logo = business?.logo_url;
-
-  /** Platform fallback — only reachable before a session resolves. */
-  const displayName = name || "VisionaryGene";
-  const monogram = name ? initials(name) : "V";
 
   const mark = logo ? (
     // Signed, per-organization URL — not a static asset next/image can size,
@@ -49,24 +75,26 @@ export function Logo({
       src={logo}
       alt=""
       aria-hidden
-      className={cn(
-        "h-9 w-9 shrink-0 rounded-[10px] border object-contain",
-        isDark ? "border-white/20 bg-white p-0.5" : "border-black/10 bg-white p-0.5",
-      )}
+      className="h-9 w-9 shrink-0 rounded-control border border-vg-border bg-vg-white object-contain p-0.5"
     />
-  ) : (
+  ) : name ? (
+    // Monogram on a brand-red fill — white text clears 6.57:1 on it.
     <span
-      className={cn(
-        "grid h-9 w-9 shrink-0 place-items-center rounded-[10px] border font-display leading-none",
-        name ? "text-lg" : "text-xl",
-        isDark
-          ? "border-brand-gold/70 text-brand-gold"
-          : "border-brand-black/30 text-brand-black",
-      )}
+      className="grid h-9 w-9 shrink-0 place-items-center rounded-control border border-vg-red-900 bg-vg-red-900 text-lg font-semibold leading-none text-vg-white"
       aria-hidden
     >
-      {monogram}
+      {initials(name)}
     </span>
+  ) : (
+    <Image
+      src={PLATFORM_MARK}
+      alt=""
+      aria-hidden
+      width={36}
+      height={37}
+      className="h-9 w-9 shrink-0"
+      preload
+    />
   );
 
   if (compact) return mark;
@@ -75,17 +103,15 @@ export function Logo({
     <span className={cn("flex items-center gap-3", className)}>
       {mark}
       <span className="flex min-w-0 flex-col leading-none">
-        <span
-          className={cn(
-            "truncate font-display font-medium leading-none",
-            "text-[15px] sm:text-[17px] tracking-[0.02em]",
-            isDark ? "text-cream" : "text-brand-black",
-          )}
-        >
-          {displayName}
-        </span>
+        {name ? (
+          <span className="truncate text-[15px] font-semibold leading-none tracking-[0.01em] text-vg-white sm:text-[17px]">
+            {name}
+          </span>
+        ) : (
+          <Wordmark />
+        )}
         {showTagline && (
-          <span className="mt-1.5 truncate text-[9px] font-medium uppercase tracking-[0.34em] text-brand-gold">
+          <span className="mt-1.5 truncate text-[9px] font-medium uppercase tracking-[0.34em] text-vg-accent-text">
             {name ? "Powered by VisionaryGene" : "Receipt Platform"}
           </span>
         )}

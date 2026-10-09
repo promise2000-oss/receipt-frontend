@@ -11,7 +11,7 @@ export function BottomNav() {
 
   return (
     <nav
-      className="no-print fixed inset-x-0 bottom-0 z-40 border-t border-brand-gold/20 bg-brand-black lg:hidden"
+      className="no-print fixed inset-x-0 bottom-0 z-40 border-t border-vg-border bg-vg-surface-1 lg:hidden"
       style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
       aria-label="Main navigation"
     >
@@ -28,18 +28,18 @@ export function BottomNav() {
                 className={cn(
                   "flex h-16 flex-col items-center justify-center gap-1 text-[10px] font-medium tracking-[0.06em] transition-colors",
                   item.cta
-                    ? "text-brand-gold"
+                    ? "text-vg-white"
                     : active
-                      ? "text-brand-gold"
-                      : "text-cream/55 hover:text-cream",
+                      ? "text-vg-accent-text"
+                      : "text-vg-text-muted hover:text-vg-white",
                 )}
               >
                 {item.cta ? (
-                  <span className="grid h-9 w-9 place-items-center rounded-full bg-brand-gold text-brand-black">
-                    <Icon className="h-[18px] w-[18px]" strokeWidth={2.2} />
+                  <span className="grid h-9 w-9 place-items-center rounded-full bg-vg-red-900 text-vg-white">
+                    <Icon className="h-[18px] w-[18px]" strokeWidth={2.2} aria-hidden />
                   </span>
                 ) : (
-                  <Icon className="h-5 w-5" strokeWidth={1.8} />
+                  <Icon className="h-5 w-5" strokeWidth={1.8} aria-hidden />
                 )}
                 <span>{item.shortLabel}</span>
               </Link>

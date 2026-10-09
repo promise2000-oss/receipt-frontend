@@ -1,3 +1,4 @@
+import { AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 
 /**
@@ -17,7 +18,9 @@ export function LoadError({
 }) {
   return (
     <div className="flex flex-col items-center px-6 py-12 text-center">
-      <p role="alert" className="max-w-sm text-sm leading-relaxed text-muted">
+      {/* Glyph + text, so the failure is not carried by colour alone. */}
+      <AlertTriangle className="mb-3 h-7 w-7 text-vg-error" strokeWidth={1.8} aria-hidden />
+      <p role="alert" className="max-w-sm text-sm leading-relaxed text-vg-text-muted">
         {message}
       </p>
       <Button variant="outline" size="sm" className="mt-5" onClick={onRetry}>

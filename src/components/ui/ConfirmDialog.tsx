@@ -12,11 +12,13 @@ interface ConfirmDialogProps {
   confirmLabel: string;
   cancelLabel?: string;
   busy?: boolean;
+  /** Destructive confirm — switches the button to the outlined error style. */
+  danger?: boolean;
   onConfirm: () => void;
   onClose: () => void;
 }
 
-/** Flat modal dialog — cream surface, thin gold border, no heavy shadow. */
+/** Modal dialog — surface-2, hairline border, 70% black scrim. */
 export function ConfirmDialog({
   open,
   title,
@@ -25,6 +27,7 @@ export function ConfirmDialog({
   confirmLabel,
   cancelLabel = "Cancel",
   busy = false,
+  danger = false,
   onConfirm,
   onClose,
 }: ConfirmDialogProps) {
@@ -49,7 +52,8 @@ export function ConfirmDialog({
 
   return (
     <div
-      className="no-print fixed inset-0 z-50 flex items-end justify-center bg-brand-black/55 p-4 sm:items-center"
+      className="no-print fixed inset-0 z-50 flex items-end justify-center p-4 sm:items-center"
+      style={{ backgroundColor: "var(--vg-overlay)" }}
       onMouseDown={() => !busy && onClose()}
     >
       <div
@@ -58,19 +62,27 @@ export function ConfirmDialog({
         aria-modal="true"
         aria-label={title}
         tabIndex={-1}
-        className="w-full max-w-md rounded-card border border-brand-gold/30 bg-surface p-6 outline-none"
+        className="w-full max-w-md rounded-card border border-vg-border bg-vg-surface-2 p-6 outline-none"
         onMouseDown={(event) => event.stopPropagation()}
       >
-        <h2 className="font-display text-xl text-ink">{title}</h2>
+        <h2 className="text-xl font-semibold tracking-tight text-vg-white">
+          {title}
+        </h2>
         {description && (
-          <p className="mt-2 text-sm leading-relaxed text-muted">{description}</p>
+          <p className="mt-2 text-sm leading-relaxed text-vg-text-muted">
+            {description}
+          </p>
         )}
         {children && <div className="mt-4">{children}</div>}
         <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
           <Button variant="outline" onClick={onClose} disabled={busy}>
             {cancelLabel}
           </Button>
-          <Button variant="dark" onClick={onConfirm} disabled={busy}>
+          <Button
+            variant={danger ? "danger" : "primary"}
+            onClick={onConfirm}
+            disabled={busy}
+          >
             {busy ? "Working…" : confirmLabel}
           </Button>
         </div>

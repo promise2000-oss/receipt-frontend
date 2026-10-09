@@ -130,8 +130,9 @@ export function HistoryView({
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
           <div className="relative w-full sm:max-w-xs">
             <Search
-              className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-brand-gold"
+              className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-vg-text-muted"
               strokeWidth={2}
+              aria-hidden
             />
             <input
               type="search"
@@ -139,16 +140,16 @@ export function HistoryView({
               onChange={(event) => setQuery(event.target.value)}
               placeholder="Customer, receipt no. or amount…"
               aria-label="Search receipts"
-              className="h-11 w-full rounded-control border border-brand-gold/25 bg-white pl-10 pr-9 text-[15px] text-ink transition-colors placeholder:text-muted/55 focus:border-brand-gold"
+              className="h-11 w-full rounded-control border border-vg-border bg-vg-surface-2 pl-10 pr-9 text-[15px] text-vg-white transition-colors placeholder:text-vg-placeholder focus:control-focus focus:outline-none"
             />
             {query && (
               <button
                 type="button"
                 onClick={() => setQuery("")}
                 aria-label="Clear search"
-                className="absolute right-2.5 top-1/2 grid h-6 w-6 -translate-y-1/2 place-items-center rounded-full text-muted hover:bg-brand-gold/10 hover:text-ink"
+                className="absolute right-2 top-1/2 grid h-7 w-7 -translate-y-1/2 place-items-center rounded-full text-vg-text-muted transition-colors hover:bg-vg-surface-3 hover:text-vg-white"
               >
-                <X className="h-3.5 w-3.5" />
+                <X className="h-3.5 w-3.5" aria-hidden />
               </button>
             )}
           </div>
@@ -176,7 +177,7 @@ export function HistoryView({
             onChange={setChip}
             ariaLabel="Filter by status"
           />
-          <span className="text-xs text-muted" aria-live="polite">
+          <span className="text-xs text-vg-text-muted" aria-live="polite">
             {error
               ? "Couldn't load"
               : receipts
