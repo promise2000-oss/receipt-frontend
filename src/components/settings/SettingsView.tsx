@@ -6,7 +6,7 @@ import { Check, ImageUp, LogOut, RotateCcw } from "lucide-react";
 import { api } from "@/lib/api";
 import { useSession } from "@/components/auth/SessionProvider";
 import { invalidateOrgName } from "@/lib/server/brand-actions";
-import { readImageAsDataUrl } from "@/lib/image";
+import { logoSizeError, readImageAsDataUrl, readImageSize } from "@/lib/image";
 import { formatMoney } from "@/lib/format";
 import {
   CONTRAST_TEXT,
@@ -242,6 +242,16 @@ export function SettingsView() {
       setError("That image is over 3 MB — please pick a smaller one.");
       return;
     }
+
+    // Same bounds the API applies, checked here so the message arrives with
+    // the file rather than after a round trip. An unreadable size (a scalable
+    // SVG with no fixed box) is left for the server, which reads its viewBox.
+    const sizeProblem = logoSizeError(await readImageSize(file));
+    if (sizeProblem) {
+      setError(sizeProblem);
+      return;
+    }
+
     setError(null);
 
     // Show it straight away, then swap in the signed URL the API returns.
@@ -475,7 +485,8 @@ export function SettingsView() {
                     </Button>
                   )}
                   <p className="pt-1 text-xs text-muted">
-                    PNG or JPG · recommended square, at least 256×256.
+                    PNG, JPG, WebP or SVG · recommended square, at least
+                    256×256. 3 MB max.
                   </p>
                   <p
                     className={cn(
