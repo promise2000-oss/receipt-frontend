@@ -36,6 +36,17 @@ const DEFAULT_ACCENT = "#D4430F";
 /** `POST /business/logo` rejects anything larger. */
 const MAX_LOGO_BYTES = 3 * 1024 * 1024;
 
+/**
+ * Watermark defaults and ceiling.
+ *
+ * Kept in step with `@eleos/shared` on the API side, which is the authority:
+ * these exist so the control can explain its own bounds before a round trip,
+ * not so the client can decide them.
+ */
+const DEFAULT_WATERMARK_TEXT = "VISIONARYGENE";
+const DEFAULT_WATERMARK_OPACITY = 8;
+const MAX_WATERMARK_OPACITY = 25;
+
 const CURRENCIES = [
   { value: "NGN", label: "NGN — Naira (₦)" },
   { value: "USD", label: "USD — US Dollar ($)" },
@@ -242,6 +253,24 @@ export function SettingsView() {
   const [primary, setPrimary] = useState(business?.brand_primary ?? DEFAULT_PRIMARY);
   const [accent, setAccent] = useState(business?.brand_accent ?? DEFAULT_ACCENT);
 
+  /**
+   * Document watermarking.
+   *
+   * Owner-only in the API — a staff member patching these gets a 403, not a
+   * silent no-op. The opacity ceiling is enforced there too, so the slider
+   * simply cannot be dragged past the point where the mark would obscure the
+   * figures beneath it.
+   */
+  const [watermarkEnabled, setWatermarkEnabled] = useState(
+    business?.watermark_enabled ?? true,
+  );
+  const [watermarkText, setWatermarkText] = useState(
+    business?.watermark_text ?? DEFAULT_WATERMARK_TEXT,
+  );
+  const [watermarkOpacity, setWatermarkOpacity] = useState(
+    business?.watermark_opacity ?? DEFAULT_WATERMARK_OPACITY,
+  );
+
   const fileRef = useRef<HTMLInputElement>(null);
 
   async function onFileChange(file: File | undefined) {
@@ -337,6 +366,12 @@ export function SettingsView() {
       setError("Both brand colours must be valid hex values (e.g. #111111).");
       return;
     }
+    if (watermarkOpacity > MAX_WATERMARK_OPACITY) {
+      setError(
+        `Keep the watermark at or below ${MAX_WATERMARK_OPACITY}% so it never obscures the figures.`,
+      );
+      return;
+    }
     setError(null);
     setSaving(true);
     try {
@@ -348,6 +383,9 @@ export function SettingsView() {
         email: email.trim(),
         website: website.trim(),
         currency,
+        watermark_enabled: watermarkEnabled,
+        watermark_text: watermarkText.trim() || DEFAULT_WATERMARK_TEXT,
+        watermark_opacity: watermarkOpacity,
         ...palette,
       });
       // The accent may have been nudged for contrast; show the value that was
@@ -561,6 +599,89 @@ export function SettingsView() {
               accent={accent}
               currency={currency}
             />
+          </CardBody>
+        </Card>
+
+        {/* ---- Document watermarking ---- */}
+        <Card>
+          <CardHeader
+            title="Document Watermark"
+            description="A faint diagonal mark printed into every receipt and invoice PDF. It sits behind the content, so figures stay readable."
+          />
+          <CardBody className="space-y-5">
+            <label className="flex items-start justify-between gap-4">
+              <span className="min-w-0">
+                <span className="block text-[15px] font-medium text-vg-white">
+                  Show the watermark
+                </span>
+                <span className="mt-1 block text-sm leading-relaxed text-vg-text-muted">
+                  Turn this off to issue documents with no watermark at all.
+                </span>
+              </span>
+              <input
+                type="checkbox"
+                checked={watermarkEnabled}
+                onChange={(event) => setWatermarkEnabled(event.target.checked)}
+                className="mt-1 h-6 w-6 shrink-0 accent-vg-red-900"
+                aria-label="Show the watermark"
+              />
+            </label>
+
+            <div className={watermarkEnabled ? "" : "pointer-events-none opacity-45"}>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <Field
+                  label="Watermark text"
+                  hint={`Leave blank to use ${DEFAULT_WATERMARK_TEXT}.`}
+                >
+                  <TextInput
+                    value={watermarkText}
+                    onChange={(event) => setWatermarkText(event.target.value)}
+                    placeholder={DEFAULT_WATERMARK_TEXT}
+                    maxLength={40}
+                  />
+                </Field>
+
+                <Field
+                  label="Opacity"
+                  hint={`${watermarkOpacity}% · max ${MAX_WATERMARK_OPACITY}% so figures stay legible.`}
+                >
+                  <input
+                    type="range"
+                    min={2}
+                    max={MAX_WATERMARK_OPACITY}
+                    step={1}
+                    value={watermarkOpacity}
+                    onChange={(event) => setWatermarkOpacity(Number(event.target.value))}
+                    className="h-11 w-full accent-vg-red-900"
+                    aria-label="Watermark opacity"
+                  />
+                </Field>
+              </div>
+
+              {/* A live preview, so the choice is visible before saving. */}
+              <div className="mt-4 overflow-hidden rounded-control border border-vg-border bg-vg-paper-bg p-4">
+                <p className="text-[10px] font-medium uppercase tracking-[0.2em] text-vg-paper-muted">
+                  Preview
+                </p>
+                <div className="relative mt-2 grid h-28 place-items-center overflow-hidden">
+                  <p className="text-center text-sm text-vg-paper-ink">
+                    Your document content appears here
+                  </p>
+                  <span
+                    aria-hidden
+                    className="pointer-events-none absolute inset-0 grid place-items-center"
+                    style={{
+                      transform: "rotate(-38deg)",
+                      color: `rgba(17, 17, 17, ${watermarkOpacity / 100})`,
+                    }}
+                  >
+                    <span className="text-[28px] font-extrabold uppercase tracking-[0.14em]">
+                      {watermarkText.trim() || DEFAULT_WATERMARK_TEXT}
+                    </span>
+                  </span>
+                </div>
+              </div>
+            </div>
           </CardBody>
         </Card>
 

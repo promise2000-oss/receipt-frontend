@@ -15,6 +15,7 @@ import { TextArea } from "@/components/ui/Field";
 import { ReceiptPreviewSkeleton } from "@/components/ui/Skeleton";
 import { ReceiptDocument } from "./ReceiptDocument";
 import { ShareBar } from "./ShareBar";
+import { receiptAsShareable } from "@/lib/share";
 
 /**
  * Receipt preview — mirrors the PDF, with share actions directly below.
@@ -203,7 +204,7 @@ export function ReceiptPreview({ id }: { id: string }) {
         />
         <div className="mt-5">
           <ShareBar
-            receipt={receipt}
+            document={receiptAsShareable(receipt)}
             business={business}
             shareUrl={share?.url ?? null}
           />

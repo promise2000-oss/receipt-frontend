@@ -2,12 +2,17 @@ import type {
   Business,
   Customer,
   DashboardSummary,
+  Invoice,
+  InvoiceFilters,
+  InvoiceInput,
+  InvoiceSummary,
   PaymentMethod,
   PaymentStatus,
   Receipt,
   ReceiptChip,
   ReceiptFilters,
   ReceiptInput,
+  ReceiptSource,
   ReceiptStatus,
   SessionInfo,
   SignInInput,
@@ -100,6 +105,9 @@ interface ApiBusiness {
   brand_primary: string;
   brand_accent: string;
   number_prefix: string;
+  watermark_enabled: boolean;
+  watermark_text: string;
+  watermark_opacity: number;
   created_at: string;
   updated_at: string;
 }
@@ -133,6 +141,8 @@ interface ApiReceipt {
     email: string | null;
   } | null;
   receipt_number: string;
+  source: ReceiptSource;
+  invoice_payment_id: string | null;
   issue_date: string;
   subtotal: number;
   discount: number;
@@ -151,6 +161,54 @@ interface ApiReceipt {
   created_by: string;
   created_at: string;
   items: ApiReceiptItem[];
+}
+
+interface ApiInvoiceItem {
+  id: string;
+  description: string;
+  quantity: number;
+  unit_price: number;
+  line_total: number;
+}
+
+interface ApiInvoicePayment {
+  id: string;
+  invoice_id: string;
+  amount: number;
+  paid_at: string;
+  method: PaymentMethod;
+  reference: string | null;
+  notes: string | null;
+  receipt_id: string | null;
+  created_at: string;
+}
+
+interface ApiInvoice {
+  id: string;
+  business_id: string;
+  customer_id: string | null;
+  customer: { id: string; name: string; phone: string | null; email: string | null } | null;
+  invoice_number: string;
+  issue_date: string;
+  due_date: string | null;
+  subtotal: number;
+  discount: number;
+  tax: number;
+  tax_rate: number;
+  total: number;
+  amount_paid: number;
+  balance_due: number;
+  status: Invoice["status"];
+  notes: string | null;
+  terms: string | null;
+  po_reference: string | null;
+  pdf_url: string | null;
+  issued_at: string | null;
+  cancelled_at: string | null;
+  cancel_reason: string | null;
+  created_at: string;
+  items: ApiInvoiceItem[];
+  payments: ApiInvoicePayment[];
 }
 
 interface ApiAuth {
@@ -280,6 +338,11 @@ function toBusiness(value: ApiBusiness): Business {
     currency: value.currency,
     brand_primary: value.brand_primary,
     brand_accent: value.brand_accent,
+    // Tolerant of an API build that predates watermarking: default to the
+    // platform default rather than rendering a Settings page full of blanks.
+    watermark_enabled: value.watermark_enabled ?? true,
+    watermark_text: value.watermark_text ?? "VISIONARYGENE",
+    watermark_opacity: value.watermark_opacity ?? 8,
     created_at: value.created_at,
     updated_at: value.updated_at ?? value.created_at,
   };
@@ -306,6 +369,8 @@ function toReceipt(value: ApiReceipt): Receipt {
     customer_name: value.customer?.name ?? "Walk-in customer",
     customer_phone: value.customer?.phone ?? null,
     customer_email: value.customer?.email ?? null,
+    source: value.source ?? "standalone",
+    invoice_payment_id: value.invoice_payment_id ?? null,
     items: (value.items ?? []).map((item) => ({
       id: item.id,
       receipt_id: value.id,
@@ -338,6 +403,57 @@ function toSession(value: ApiAuth): SessionInfo {
     email: value.user.email,
     role: value.user.role,
     business: toBusiness(value.business),
+  };
+}
+
+function toInvoice(value: ApiInvoice): Invoice {
+  return {
+    id: value.id,
+    business_id: value.business_id,
+    customer_id: value.customer_id,
+    customer_name: value.customer?.name ?? "Walk-in customer",
+    customer_phone: value.customer?.phone ?? null,
+    customer_email: value.customer?.email ?? null,
+    invoice_number: value.invoice_number,
+    issue_date: value.issue_date,
+    due_date: value.due_date,
+    items: (value.items ?? []).map((item) => ({
+      id: item.id,
+      description: item.description,
+      quantity: item.quantity,
+      unit_price: item.unit_price,
+      line_total: item.line_total,
+    })),
+    subtotal: value.subtotal,
+    discount: value.discount,
+    tax: value.tax,
+    tax_rate: value.tax_rate,
+    total: value.total,
+    amount_paid: value.amount_paid,
+    // The API's figure, not `total - amount_paid` recomputed here. The server
+    // owns the arithmetic; duplicating it in the client is how a UI ends up
+    // disagreeing with the document.
+    balance_due: value.balance_due,
+    status: value.status,
+    notes: value.notes,
+    terms: value.terms,
+    po_reference: value.po_reference,
+    pdf_url: value.pdf_url,
+    issued_at: value.issued_at,
+    cancelled_at: value.cancelled_at,
+    cancel_reason: value.cancel_reason,
+    payments: (value.payments ?? []).map((payment) => ({
+      id: payment.id,
+      invoice_id: payment.invoice_id,
+      amount: payment.amount,
+      paid_at: payment.paid_at,
+      method: payment.method,
+      reference: payment.reference,
+      notes: payment.notes,
+      receipt_id: payment.receipt_id,
+      created_at: payment.created_at,
+    })),
+    created_at: value.created_at,
   };
 }
 
@@ -395,6 +511,13 @@ const BUSINESS_FIELDS = [
   "currency",
   "brand_primary",
   "brand_accent",
+] as const;
+
+/** Watermarking is owner-only server-side, and booleans need their own field. */
+const WATERMARK_FIELDS = [
+  "watermark_enabled",
+  "watermark_text",
+  "watermark_opacity",
 ] as const;
 
 export const api = {
@@ -461,10 +584,16 @@ export const api = {
   },
 
   async updateBusiness(patch: Partial<Business>): Promise<Business> {
-    const body: Record<string, string> = {};
+    const body: Record<string, unknown> = {};
     for (const field of BUSINESS_FIELDS) {
       const value = patch[field];
       if (typeof value === "string") body[field] = value;
+    }
+    // Watermark fields are typed differently (boolean + number), so they are
+    // collected separately rather than forced through the string-only loop.
+    for (const field of WATERMARK_FIELDS) {
+      const value = patch[field];
+      if (value !== undefined) body[field] = value;
     }
     if (Object.keys(body).length === 0) return api.getBusiness();
     return toBusiness(
@@ -656,4 +785,186 @@ export const api = {
       recent: (summary.recent ?? []).map(toReceipt),
     };
   },
+
+  /* ------------------------------- Invoices ------------------------------ */
+
+  async getInvoices(filters: InvoiceFilters = {}): Promise<Invoice[]> {
+    const params = new URLSearchParams();
+    const query = filters.q?.trim();
+    if (query) params.set("search", query);
+
+    const chip = filters.chip ?? "all";
+    if (chip !== "all") params.set("status", chip);
+
+    params.set("limit", String(PAGE_SIZE));
+
+    const invoices: Invoice[] = [];
+    for (let page = 1; page <= MAX_PAGES; page += 1) {
+      params.set("page", String(page));
+      const batch = await request<ApiList<ApiInvoice>>(`/invoices?${params}`);
+      invoices.push(...batch.items.map(toInvoice));
+      if (batch.items.length < PAGE_SIZE) break;
+    }
+
+    return invoices.sort((a, b) => b.issue_date.localeCompare(a.issue_date));
+  },
+
+  /** Accepts either the invoice's UUID or its `INV-000001` number. */
+  async getInvoice(idOrNumber: string): Promise<Invoice | null> {
+    if (!UUID_RE.test(idOrNumber)) {
+      const list = await request<ApiList<ApiInvoice>>(
+        `/invoices?search=${encodeURIComponent(idOrNumber)}&limit=${PAGE_SIZE}`,
+      );
+      const exact = list.items.find((item) => item.invoice_number === idOrNumber);
+      const id = exact?.id ?? (list.items.length === 1 ? list.items[0].id : null);
+      if (!id) return null;
+      return api.getInvoice(id);
+    }
+
+    try {
+      return toInvoice(await request<ApiInvoice>(`/invoices/${idOrNumber}`));
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 404) return null;
+      throw error;
+    }
+  },
+
+  async createInvoice(input: InvoiceInput): Promise<Invoice> {
+    let customerId = input.customer.id ?? null;
+
+    if (!customerId) {
+      const name = input.customer.name.trim();
+      const phone = input.customer.phone?.trim() || null;
+      const customers = await api.getCustomers();
+      const match = customers.find(
+        (customer) =>
+          (phone &&
+            customer.phone &&
+            normalise(customer.phone) === normalise(phone)) ||
+          normalise(customer.name) === normalise(name),
+      );
+      customerId = match
+        ? match.id
+        : (
+            await api.createCustomer({
+              name,
+              phone: phone ?? undefined,
+              email: input.customer.email,
+            })
+          ).id;
+    }
+
+    const created = await request<ApiInvoice>("/invoices", {
+      method: "POST",
+      body: jsonBody({
+        customer_id: customerId,
+        issue_date: undefined,
+        due_date: input.due_date || null,
+        items: input.items.map((item) => ({
+          description: item.description.trim(),
+          quantity: item.quantity,
+          unit_price: item.unit_price,
+        })),
+        discount: input.discount,
+        tax_rate: input.tax_rate,
+        notes: input.notes?.trim() || null,
+        terms: input.terms?.trim() || null,
+        po_reference: input.po_reference?.trim() || null,
+        issue: input.issue,
+      }),
+    });
+
+    return toInvoice(created);
+  },
+
+  async issueInvoice(idOrNumber: string): Promise<Invoice> {
+    const id = await resolveInvoiceId(idOrNumber);
+    return toInvoice(
+      await request<ApiInvoice>(`/invoices/${id}/issue`, {
+        method: "POST",
+        body: jsonBody({}),
+      }),
+    );
+  },
+
+  async cancelInvoice(idOrNumber: string, reason: string): Promise<Invoice> {
+    const id = await resolveInvoiceId(idOrNumber);
+    return toInvoice(
+      await request<ApiInvoice>(`/invoices/${id}/cancel`, {
+        method: "POST",
+        body: jsonBody({ reason }),
+      }),
+    );
+  },
+
+  /**
+   * Record a payment. The server recomputes the balance, the status and the
+   * generated receipt, and returns all three — the UI renders the response
+   * rather than predicting it.
+   */
+  async recordPayment(
+    idOrNumber: string,
+    input: {
+      amount: number;
+      method: PaymentMethod;
+      reference?: string;
+      notes?: string;
+      generate_receipt?: boolean;
+    },
+  ): Promise<{
+    invoice: Invoice;
+    receipt: Receipt | null;
+    balance_due: number;
+  }> {
+    const id = await resolveInvoiceId(idOrNumber);
+    const result = await request<{
+      invoice: ApiInvoice;
+      receipt: ApiReceipt | null;
+      balance_due: number;
+    }>(`/invoices/${id}/payments`, {
+      method: "POST",
+      body: jsonBody({
+        amount: input.amount,
+        method: input.method,
+        reference: input.reference?.trim() || null,
+        notes: input.notes?.trim() || null,
+        generate_receipt: input.generate_receipt ?? true,
+      }),
+    });
+
+    return {
+      invoice: toInvoice(result.invoice),
+      receipt: result.receipt ? toReceipt(result.receipt) : null,
+      balance_due: result.balance_due,
+    };
+  },
+
+  async getInvoiceSummary(): Promise<InvoiceSummary> {
+    const summary = await request<{
+      currency: string;
+      totals: InvoiceSummary["totals"];
+      recent: ApiInvoice[];
+    }>("/invoices/summary");
+    return {
+      currency: summary.currency,
+      totals: summary.totals,
+      recent: (summary.recent ?? []).map(toInvoice),
+    };
+  },
 };
+
+/**
+ * Invoice routes address invoices by UUID, but the UI's URLs use the human
+ * number (`INV-000001`) — the same accommodation receipts get, so a link
+ * someone writes on a printed invoice keeps working.
+ */
+async function resolveInvoiceId(idOrNumber: string): Promise<string> {
+  if (UUID_RE.test(idOrNumber)) return idOrNumber;
+  const list = await request<ApiList<ApiInvoice>>(
+    `/invoices?search=${encodeURIComponent(idOrNumber)}&limit=${PAGE_SIZE}`,
+  );
+  const exact = list.items.find((item) => item.invoice_number === idOrNumber);
+  if (exact) return exact.id;
+  if (list.items.length === 1) return list.items[0].id;
+  throw new ApiError("Invoice not found.", 404, "NOT_FOUND");
+}

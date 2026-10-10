@@ -36,12 +36,100 @@ npm run test    # Vitest (brand/identity unit tests)
 | `/` | Dashboard — today / week / month totals + recent receipts |
 | `/receipts/new` | Issue a receipt — customer picker, live line totals, discount, payment status |
 | `/receipts` | History — search, date & status filters (Paid / Partial / Pending / Void) |
-| `/receipts/[id]` | Receipt document — share via WhatsApp, email, PDF (print), copy link; duplicate or void |
+| `/receipts/[id]` | Receipt document — export as PDF/PNG, native share, WhatsApp, email, copy link; duplicate or void |
+| `/invoices/new` | Create an invoice — line items, tax rate, discount, due date, terms, PO reference. Save as draft, or issue immediately |
+| `/invoices` | Invoice history — search, status filters, and real invoiced / outstanding / overdue totals |
+| `/invoices/[id]` | Invoice document — issue, record payments, export as PDF/PNG, share; cancel with a reason |
 | `/customers` | Customer list with lifetime stats + detail drawer |
-| `/settings` | Organization details, website, logo (auto-saves), brand colours, account |
+| `/settings` | Organization details, website, logo (auto-saves), brand colours, **document watermark**, account |
 
 Every route except `/login` and `/signup` requires a signed-in organization —
 the app shell redirects to `/login` otherwise.
+
+## Invoicing
+
+An invoice is a document someone owes money on, so it is modelled differently
+from a receipt — and deliberately so.
+
+- **Lifecycle.** `draft → issued → partially_paid → paid`, with `overdue`
+  derived from "issued, unpaid, past the due date" and `cancelled` as a
+  business event rather than a delete. A draft is editable; an issued invoice
+  is **not** — corrections are cancel + reissue, enforced at the ORM
+  boundary, not just in the UI.
+- **Creating an invoice never marks it paid.** Issuing assigns the number and
+  freezes the figures. Money only moves when a payment is recorded.
+- **Partial payments.** Several payments can settle one invoice. Each records
+  the amount, date, method and reference, and advances the status through
+  `nextInvoiceStatus`. The outstanding balance is always
+  `total − amount_paid`, computed server-side; the UI renders what the API
+  returns rather than repeating the arithmetic.
+- **Payment → receipt.** Recording a payment generates a receipt *in the same
+  transaction*, for the amount actually received — a ₦200,000 part-payment
+  against a ₦570,000 invoice yields a ₦200,000 receipt that names the invoice
+  and the remaining balance. `receipts.invoice_payment_id` is `UNIQUE`, so a
+  payment can never produce two documents.
+- **Numbering.** Invoices use their own `INV-000001` series, allocated under
+  the same row lock as receipts but on a separate counter, so issuing an
+  invoice never leaves a gap in receipt numbering.
+- **Documents.** Invoices render through the same template family as receipts
+  (same band, table, totals, watermark), with a due date, a terms line, a
+  balance and a payment history instead of an amount paid.
+
+## Exports & sharing
+
+The receipt "Download PDF" button used to call `window.print()`, which handed
+the browser's print dialog the *app's preview page* — so the exported file was
+whatever the local printer driver produced from CSS print rules, not the
+branded document the product generates. It now downloads the real PDF the API
+renders, and every export goes through the server:
+
+| Action | Endpoint |
+| --- | --- |
+| Download receipt PDF / PNG | `GET /api/receipts/:id/pdf` · `/image` |
+| Download invoice PDF / PNG | `GET /api/invoices/:id/pdf` · `/image` |
+
+- **PDF** — Puppeteer rendering the same HTML the preview uses, A4, real page
+  dimensions and page breaks.
+- **PNG** — the *same* HTML in the same headless browser at 2× scale with
+  `fullPage`, so the image is the document, not a screenshot of the app's
+  preview pane. A long itemisation is never cut off.
+- **Filenames** — `visionarygene-receipt-ES-000123.pdf`,
+  `visionarygene-invoice-INV-000123.pdf`. Namespaced by *document*, never by
+  organization: the number is already unique per tenant, and a business name
+  in a filename would leak another tenant's identity into a file that gets
+  forwarded.
+- **Share** — `navigator.share` with the file attached, where the device
+  supports it. `canShareFiles()` checks that `canShare` actually accepts a
+  file, because desktop Chrome exposes `navigator.share` but frequently cannot
+  take one — offering Share there would promise something it cannot deliver.
+- **Fallback** — everywhere else the identical file downloads, and the UI says
+  so plainly. A user dismissing the share sheet is reported as a cancellation,
+  not a success; a generation failure is never dressed up as one.
+
+## Document watermark
+
+Every generated receipt and invoice carries a faint diagonal **VISIONARYGENE**
+mark, painted into the HTML template that Puppeteer turns into the PDF — so it
+is a real layer of the exported file, not a browser overlay.
+
+| Property | Value |
+| --- | --- |
+| Text | `VISIONARYGENE` (spelled exactly) |
+| Rotation | −38°, inside the 35–45° band |
+| Opacity | 8% by default, capped at 25% |
+| Layer | Behind the header band, table and totals |
+
+- **Every page.** On screen it is `position: absolute`, centred in the document
+  box; in print it is `position: fixed`, which Chromium repeats on each page —
+  verified by decompressing a 4-page PDF and confirming the mark adds bytes to
+  pages 2, 3 and 4.
+- **Per-organization.** Settings → *Document Watermark* lets a tenant re-word
+  the text, change the opacity, or switch it off entirely. Owner-only in the
+  API (`requireOwner` on `PATCH /business`).
+- **Safe by construction.** Blank text falls back to the platform name and the
+  opacity is clamped, so no stored value can produce an unwatermarked document
+  by accident or an unreadable one by choice. The text is HTML-escaped like
+  every other interpolated value.
 
 ## Organization identity
 
@@ -130,16 +218,19 @@ shrinking below the touch floor.
 
 ## Print / PDF
 
-**Download PDF** on a receipt opens the browser print dialog. Print styles in
-`app/globals.css` hide all app chrome (top bar, sidebar, page title, share
-buttons) and render only the receipt document.
+**Download PDF** on a receipt or invoice fetches the branded document the API
+renders. There is a browser print stylesheet in `app/globals.css` as well, for
+the cases where printing the on-screen page is what someone actually wants;
+it hides all app chrome (top bar, sidebar, page title, share buttons) and
+renders only the document.
 
-The printout is deliberately **monochrome**: the page goes white, header bands
-become rules, tinted strips become white, and all text goes black — high
-contrast, low ink, and it stays legible on any office printer. Four things keep
-their colour on purpose, all red enough to survive as *darker* ink on a mono
-printer: the **header rule**, the **total**, the **footer rule**, and the
-organization's **logo**. The **QR code** stays pure black on white so it scans.
+The print stylesheet is deliberately **monochrome**: the page goes white,
+header bands become rules, tinted strips become white, and all text goes
+black — high contrast, low ink, and it stays legible on any office printer.
+Four things keep their colour on purpose, all red enough to survive as
+*darker* ink on a mono printer: the **header rule**, the **total**, the
+**footer rule**, and the organization's **logo**. The **QR code** stays pure
+black on white so it scans.
 
 The receipt document stays a light "paper" object even on the dark app. An
 organization's logo and header band are designed for white, and a dark preview
@@ -300,13 +391,17 @@ src/
     auth/             # session provider + login/signup screen
     brand/            # Logo (organization mark, platform fallback)
     dashboard/        # dashboard view (client child of a server page)
-    receipt/          # form, document, preview, history view
+    receipt/          # form, document, preview, history view, share/export bar
+    invoice/          # builder, history, detail + payment recording
     customers/        # list + drawer
     settings/         # settings form + template preview
     shell/            # top bar, sidebar, bottom nav, app shell (auth gate)
     ui/               # Button, Card, Field, StatusBadge, dialogs, …
   lib/
     api.ts            # HTTP client
+    calc.ts           # line/total arithmetic (mirrors @eleos/shared)
+    export.ts         # PDF/PNG fetch, Web Share API + download fallback
+    share.ts          # WhatsApp / email deep links, shareable projection
     brand.ts          # monograms, WCAG contrast, logo sampling, palette
     server/brand.ts   # server-side organization name for page titles
     types.ts          # domain types

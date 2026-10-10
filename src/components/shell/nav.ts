@@ -4,6 +4,7 @@ import {
   ReceiptText,
   Settings,
   Users,
+  FileText,
   type LucideIcon,
 } from "lucide-react";
 
@@ -42,6 +43,13 @@ export const NAV_ITEMS: NavItem[] = [
     isActive: (pathname) => pathname.startsWith("/receipts"),
   },
   {
+    href: "/invoices",
+    label: "Invoices",
+    shortLabel: "Invoices",
+    icon: FileText,
+    isActive: (pathname) => pathname.startsWith("/invoices"),
+  },
+  {
     href: "/customers",
     label: "Customers",
     shortLabel: "Customers",
@@ -57,11 +65,15 @@ export const NAV_ITEMS: NavItem[] = [
   },
 ];
 
-/** Bottom nav keeps the New Receipt CTA centred. */
+/**
+ * The bottom nav keeps the New Receipt CTA centred and holds five items —
+ * one more would push the touch targets under 44px on a narrow phone, so
+ * Customers (the least-used of the five) is the one that stays desktop-only.
+ */
 export const BOTTOM_NAV_ITEMS: NavItem[] = [
   NAV_ITEMS[0],
   NAV_ITEMS[2],
   NAV_ITEMS[1],
-  NAV_ITEMS[3],
   NAV_ITEMS[4],
+  NAV_ITEMS[5],
 ];
