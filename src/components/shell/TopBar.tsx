@@ -33,7 +33,7 @@ export function TopBar() {
   return (
     <header className="no-print sticky top-0 z-40 border-b border-vg-border bg-vg-surface-1">
       <div className="flex h-16 items-center gap-3 px-4 sm:gap-4 sm:px-6 lg:px-8">
-        <Link href="/" aria-label="VisionaryGene dashboard" className="shrink-0">
+        <Link href="/dashboard" aria-label="VisionaryGene dashboard" className="shrink-0">
           <Logo showTagline={false} />
         </Link>
 

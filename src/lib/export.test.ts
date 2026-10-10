@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { canShareFiles, defaultFileName, fileNameFromDisposition } from "./export";
+import {
+  canShareFiles,
+  defaultFileName,
+  documentExportUrl,
+  fileNameFromDisposition,
+} from "./export";
 import { invoiceAsShareable, receiptAsShareable } from "./share";
 
 /**
@@ -72,6 +77,47 @@ describe("defaultFileName", () => {
     // — and including one would leak another tenant's identity into a file
     // the user forwards.
     expect(defaultFileName("invoice", "INV-000001", "pdf")).not.toContain("Acme");
+  });
+});
+
+describe("documentExportUrl", () => {
+  /**
+   * Regression guard for a shipped bug.
+   *
+   * The URL used to interpolate the format directly, so PNG requested
+   * `/api/receipts/:id/png` while the API serves `/image` — a 404 for PNG
+   * that never showed up for PDF, whose segment happens to match. Every
+   * combination is asserted here so the two vocabularies cannot drift again.
+   */
+  it("maps every kind/format pair to the route the API actually defines", () => {
+    expect(documentExportUrl("receipt", "abc", "pdf")).toBe("/api/receipts/abc/pdf");
+    expect(documentExportUrl("receipt", "abc", "png")).toBe("/api/receipts/abc/image");
+    expect(documentExportUrl("invoice", "abc", "pdf")).toBe("/api/invoices/abc/pdf");
+    expect(documentExportUrl("invoice", "abc", "png")).toBe("/api/invoices/abc/image");
+  });
+
+  it("never asks for a bare `/:id/png`, which is not a route", () => {
+    // The exact shape that 404'd in production.
+    expect(documentExportUrl("receipt", "abc", "png")).not.toContain("/png");
+  });
+
+  it("encodes the id so a hostile value cannot escape the path", () => {
+    expect(documentExportUrl("receipt", "../../admin", "pdf")).toBe(
+      "/api/receipts/..%2F..%2Fadmin/pdf",
+    );
+    expect(documentExportUrl("invoice", "a b", "png")).toBe("/api/invoices/a%20b/image");
+  });
+
+  it("covers all four combinations, so a new kind cannot be half-wired", () => {
+    const kinds = ["receipt", "invoice"] as const;
+    const formats = ["pdf", "png"] as const;
+    for (const kind of kinds) {
+      for (const format of formats) {
+        expect(documentExportUrl(kind, "id", format)).toMatch(
+          /^\/api\/(receipts|invoices)\/id\/(pdf|image)$/,
+        );
+      }
+    }
   });
 });
 

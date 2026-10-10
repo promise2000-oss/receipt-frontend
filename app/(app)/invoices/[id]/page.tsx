@@ -11,7 +11,6 @@ export async function generateMetadata(
     description: "Preview, share, or export this invoice.",
     // A specific customer's document. Must never appear in a search index,
     // and must never leak the reference into a public metadata surface.
-    robots: { index: false, follow: false, nocache: true },
   };
 }
 

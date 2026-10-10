@@ -109,7 +109,7 @@ export function InvoicesView({
         title="Couldn't load your invoices"
         description={error}
         action={
-          <ButtonLink href="/" variant="outline">
+          <ButtonLink href="/dashboard" variant="outline">
             <ArrowLeft className="h-4 w-4" />
             Back to dashboard
           </ButtonLink>

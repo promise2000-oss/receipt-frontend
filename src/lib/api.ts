@@ -1,11 +1,14 @@
 import type {
+  AuditLog,
   Business,
   Customer,
   DashboardSummary,
+  Invitation,
   Invoice,
   InvoiceFilters,
   InvoiceInput,
   InvoiceSummary,
+  Member,
   PaymentMethod,
   PaymentStatus,
   Receipt,
@@ -14,9 +17,11 @@ import type {
   ReceiptInput,
   ReceiptSource,
   ReceiptStatus,
+  Role,
   SessionInfo,
   SignInInput,
   SignUpInput,
+  TeamSummary,
 } from "./types";
 
 /**
@@ -950,6 +955,77 @@ export const api = {
       totals: summary.totals,
       recent: (summary.recent ?? []).map(toInvoice),
     };
+  },
+
+  /* ---------------------------------- Team -------------------------------- */
+
+  async getTeam(): Promise<TeamSummary> {
+    return request<TeamSummary>("/team");
+  },
+
+  /**
+   * Send an invitation.
+   *
+   * The response carries the plaintext token exactly once — the server stores
+   * only a hash, so it cannot be retrieved later and the UI must show it now.
+   */
+  async inviteMember(input: { email: string; role: Role }): Promise<Invitation> {
+    return request<Invitation>("/team/invitations", {
+      method: "POST",
+      body: jsonBody({ email: input.email.trim().toLowerCase(), role: input.role }),
+    });
+  },
+
+  async revokeInvitation(id: string): Promise<void> {
+    await request(`/team/invitations/${encodeURIComponent(id)}`, { method: "DELETE" });
+  },
+
+  /** Redeem an invitation. No session — the token is the authorisation. */
+  async acceptInvitation(input: {
+    token: string;
+    email: string;
+    full_name: string;
+    password: string;
+  }): Promise<Member> {
+    return request<Member>("/team/invitations/accept", {
+      method: "POST",
+      body: jsonBody({
+        token: input.token,
+        email: input.email.trim().toLowerCase(),
+        full_name: input.full_name.trim(),
+        password: input.password,
+      }),
+    });
+  },
+
+  async changeMemberRole(userId: string, role: Role): Promise<Member> {
+    return request<Member>(`/team/${encodeURIComponent(userId)}/role`, {
+      method: "PATCH",
+      body: jsonBody({ role }),
+    });
+  },
+
+  async removeMember(userId: string): Promise<void> {
+    await request(`/team/${encodeURIComponent(userId)}`, { method: "DELETE" });
+  },
+
+  /* --------------------------------- Audit -------------------------------- */
+
+  /**
+   * The organization's audit trail.
+   *
+   * Read-only by construction: the API exposes no verb that can change an
+   * entry, so there is nothing for this client to call that would.
+   */
+  async getAuditLog(
+    filters: { action?: string; resourceType?: string; page?: number } = {},
+  ): Promise<AuditLog> {
+    const params = new URLSearchParams();
+    if (filters.action) params.set("action", filters.action);
+    if (filters.resourceType) params.set("resource_type", filters.resourceType);
+    params.set("limit", "50");
+    params.set("page", String(filters.page ?? 1));
+    return request<AuditLog>(`/audit?${params}`);
   },
 };
 

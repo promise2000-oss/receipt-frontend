@@ -17,6 +17,7 @@ import {
 import { api } from "@/lib/api";
 import { formatDate, formatDateTime, formatMoney, formatQuantity } from "@/lib/format";
 import {
+  can,
   INVOICE_STATUS_LABELS,
   PAYMENT_METHOD_LABELS,
   type Invoice,
@@ -59,7 +60,8 @@ const METHOD_OPTIONS: Array<{ value: PaymentMethod; label: string; icon: typeof 
  */
 export function InvoicePreview({ id }: { id: string }) {
   const router = useRouter();
-  const business = useSession().session?.business;
+  const session = useSession().session;
+  const business = session?.business;
   const currency = business?.currency ?? "NGN";
 
   /** undefined = loading · null = not found */
@@ -134,7 +136,16 @@ export function InvoicePreview({ id }: { id: string }) {
   const isDraft = invoice.status === "draft";
   const isCancelled = invoice.status === "cancelled";
   const isSettled = invoice.balance_due <= 0;
-  const canPay = !isDraft && !isCancelled && !isSettled;
+
+  /**
+   * Lifecycle actions are gated by role as well as by invoice state, from the
+   * same matrix the API enforces. A viewer can open this page and read every
+   * figure; they simply are not offered buttons the server would refuse.
+   */
+  const role = session?.role ?? "viewer";
+  const canPay = can(role, "invoice.recordPayment") && !isDraft && !isCancelled && !isSettled;
+  const canIssue = can(role, "invoice.issue") && isDraft;
+  const canCancel = can(role, "invoice.cancel") && !isDraft && !isCancelled;
 
   const parsedAmount = Number(amount) || 0;
   const overBalance = parsedAmount > invoice.balance_due;
@@ -219,7 +230,7 @@ export function InvoicePreview({ id }: { id: string }) {
         </Link>
 
         <div className="flex flex-wrap items-center gap-3">
-          {isDraft && (
+          {canIssue && (
             <Button variant="primary" size="sm" onClick={issue} disabled={issueBusy}>
               <Send className="h-4 w-4" strokeWidth={1.9} />
               {issueBusy ? "Issuing…" : "Issue Invoice"}
@@ -231,7 +242,7 @@ export function InvoicePreview({ id }: { id: string }) {
               Record Payment
             </Button>
           )}
-          {!isDraft && !isCancelled && (
+          {canCancel && (
             <Button variant="danger" size="sm" onClick={() => setCancelOpen(true)}>
               <XCircle className="h-4 w-4" strokeWidth={1.9} />
               Cancel

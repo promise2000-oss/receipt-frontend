@@ -21,11 +21,11 @@ export interface NavItem {
 
 export const NAV_ITEMS: NavItem[] = [
   {
-    href: "/",
+    href: "/dashboard",
     label: "Dashboard",
     shortLabel: "Home",
     icon: LayoutDashboard,
-    isActive: (pathname) => pathname === "/",
+    isActive: (pathname) => pathname === "/dashboard",
   },
   {
     href: "/receipts/new",
@@ -57,6 +57,13 @@ export const NAV_ITEMS: NavItem[] = [
     isActive: (pathname) => pathname.startsWith("/customers"),
   },
   {
+    href: "/team",
+    label: "Team",
+    shortLabel: "Team",
+    icon: Users,
+    isActive: (pathname) => pathname.startsWith("/team"),
+  },
+  {
     href: "/settings",
     label: "Settings",
     shortLabel: "Settings",
@@ -75,5 +82,5 @@ export const BOTTOM_NAV_ITEMS: NavItem[] = [
   NAV_ITEMS[2],
   NAV_ITEMS[1],
   NAV_ITEMS[4],
-  NAV_ITEMS[5],
+  NAV_ITEMS[6],
 ];

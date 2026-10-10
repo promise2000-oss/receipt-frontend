@@ -39,11 +39,159 @@ export const PAYMENT_METHOD_LABELS: Record<PaymentMethod, string> = {
   other: "Other",
 };
 
+/* --------------------------------- Team -------------------------------- */
+
 /**
- * `owner` is the organization administrator, `staff` a regular member.
- * Enforced server-side on organization settings; see `requireOwner` in the API.
+ * Membership role.
+ *
+ * Mirrors the enum in the database and the matrix in `@eleos/shared`. The
+ * server is the authority on what each role may do — these labels and the
+ * ordering exist so the UI can *hide* a control the API would refuse, never to
+ * grant one it would not.
  */
-export type Role = "owner" | "staff";
+export type Role = "owner" | "admin" | "staff" | "viewer";
+
+export const ROLES: Role[] = ["owner", "admin", "staff", "viewer"];
+
+export const ROLE_LABELS: Record<Role, string> = {
+  owner: "Owner",
+  admin: "Admin",
+  staff: "Staff",
+  viewer: "Viewer",
+};
+
+export const ROLE_DESCRIPTIONS: Record<Role, string> = {
+  owner: "Full control, including ownership transfer and deleting the organization.",
+  admin: "Runs day-to-day operations: team, receipts, invoices, customers and settings.",
+  staff: "Issues receipts and records payments. Cannot change organization settings.",
+  viewer: "Read-only. Cannot create, edit, delete or record anything.",
+};
+
+/** Higher rank outranks lower. Mirrors `canAssignRole` on the server. */
+const ROLE_RANK: Record<Role, number> = { viewer: 0, staff: 1, admin: 2, owner: 3 };
+
+export function outranks(actor: Role, target: Role): boolean {
+  return ROLE_RANK[actor] > ROLE_RANK[target];
+}
+
+/** Whether this actor may assign `target` to somebody. */
+export function canAssignRole(actor: Role, target: Role): boolean {
+  return outranks(actor, target);
+}
+
+/**
+ * The permissions this role holds, mirroring `@eleos/shared#can`.
+ *
+ * Present so the UI can hide a control the API would refuse. It is a
+ * convenience layer, not a security boundary: every one of these is enforced
+ * server-side, and a client that disagreed would only ever see a 403.
+ *
+ * Kept deliberately small and matching the server's grant lists exactly — a
+ * permission invented here would render a button that always fails.
+ */
+export type Permission =
+  | "org.update"
+  | "org.delete"
+  | "team.invite"
+  | "team.updateRole"
+  | "team.revoke"
+  | "customer.create"
+  | "customer.update"
+  | "customer.delete"
+  | "receipt.create"
+  | "receipt.void"
+  | "invoice.create"
+  | "invoice.update"
+  | "invoice.issue"
+  | "invoice.cancel"
+  | "invoice.recordPayment";
+
+const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
+  owner: [
+    "org.update", "org.delete",
+    "team.invite", "team.updateRole", "team.revoke",
+    "customer.create", "customer.update", "customer.delete",
+    "receipt.create", "receipt.void",
+    "invoice.create", "invoice.update", "invoice.issue", "invoice.cancel",
+    "invoice.recordPayment",
+  ],
+  admin: [
+    "org.update",
+    "team.invite", "team.updateRole", "team.revoke",
+    "customer.create", "customer.update", "customer.delete",
+    "receipt.create", "receipt.void",
+    "invoice.create", "invoice.update", "invoice.issue", "invoice.cancel",
+    "invoice.recordPayment",
+  ],
+  // Matches the server: staff do the day-to-day work, including issuing
+  // receipts and recording payments, but administer nothing and cancel
+  // nothing.
+  staff: [
+    "customer.create", "customer.update",
+    "receipt.create", "receipt.void",
+    "invoice.create", "invoice.recordPayment",
+  ],
+  viewer: [],
+};
+
+export function can(role: Role | null | undefined, permission: Permission): boolean {
+  if (!role) return false;
+  return ROLE_PERMISSIONS[role]?.includes(permission) ?? false;
+}
+
+export interface Member {
+  id: string;
+  business_id: string;
+  full_name: string;
+  email: string;
+  phone: string | null;
+  role: Role;
+  created_at: string;
+}
+
+export interface Invitation {
+  id: string;
+  email: string;
+  role: Role;
+  expires_at: string;
+  created_at: string;
+  /**
+   * The plaintext token, returned exactly once at creation. The server keeps
+   * only a hash, so this cannot be shown again — a caller that loses it must
+   * re-invite.
+   */
+  token?: string;
+  /** A ready-made link an owner can copy and send. */
+  accept_url?: string;
+}
+
+export interface TeamSummary {
+  members: Member[];
+  invitations: Invitation[];
+  /** The roles this actor may grant, computed server-side. */
+  assignable_roles: Role[];
+}
+
+/* --------------------------------- Audit -------------------------------- */
+
+export interface AuditEntry {
+  id: string;
+  action: string;
+  resource_type: string | null;
+  resource_id: string | null;
+  metadata: Record<string, unknown> | null;
+  created_at: string;
+  actor: { id: string; full_name: string; email: string } | null;
+}
+
+export interface AuditLog {
+  items: AuditEntry[];
+  total: number;
+  page: number;
+  limit: number;
+  /** The action vocabulary present in this organization's log. */
+  actions: string[];
+}
 
 /* ------------------------------ Accounts ------------------------------ */
 

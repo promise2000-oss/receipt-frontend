@@ -8,7 +8,6 @@ export async function generateMetadata(): Promise<Metadata> {
     title: await pageTitle("Invoices"),
     description: "Searchable history of every invoice you have issued.",
     // Invoice history is a customer's financial data — never indexed.
-    robots: { index: false, follow: false },
   };
 }
 

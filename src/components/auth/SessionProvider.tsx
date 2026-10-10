@@ -111,3 +111,19 @@ export function useSession(): SessionContextValue {
   }
   return value;
 }
+
+/**
+ * The session, or `null` when there is no provider above.
+ *
+ * For components that legitimately render in both places — the `Logo` shows a
+ * signed-in organization's mark inside the app and the platform mark on the
+ * public marketing pages, which sit outside the provider entirely. Throwing
+ * there would make the marketing site a render error rather than a signed-out
+ * page.
+ *
+ * Inside the app, prefer {@link useSession}: it fails loudly if the provider
+ * is ever removed by mistake, which is what caught this in the first place.
+ */
+export function useOptionalSession(): SessionContextValue | null {
+  return useContext(SessionContext) ?? null;
+}

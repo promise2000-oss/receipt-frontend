@@ -7,7 +7,6 @@ export async function generateMetadata(): Promise<Metadata> {
     title: await pageTitle("New Invoice"),
     description: "Bill a customer and start tracking what is owed.",
     // An invoice composer is a private working surface — never indexed.
-    robots: { index: false, follow: false },
   };
 }
 

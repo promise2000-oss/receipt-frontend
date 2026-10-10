@@ -8,8 +8,18 @@ import { BottomNav } from "./BottomNav";
 import { Logo } from "@/components/brand/Logo";
 import { useSession } from "@/components/auth/SessionProvider";
 
-/** Routes that render without the signed-in chrome (and without a guard). */
-const PUBLIC_PATHS = ["/login", "/signup"];
+/**
+ * Auth screens render bare and full-bleed.
+ *
+ * The public marketing pages are *not* listed here — they live in their own
+ * route group with their own layout and never reach this component at all.
+ * Keeping them separate is what lets a crawler fetch `/` without an auth wall
+ * while the app stays behind its guard.
+ */
+const PUBLIC_PATHS = ["/login", "/signup", "/accept-invite"];
+
+/** Where the app lives now that `/` is the public marketing page. */
+const APP_HOME = "/dashboard";
 
 /**
  * App chrome: near-black top bar + near-black sidebar (lg+) / bottom nav
@@ -29,8 +39,8 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (isPublic) {
-      // Already signed in? Send people straight to their dashboard.
-      if (signedIn) router.replace("/");
+      // Already signed in? Send people straight to their workspace.
+      if (signedIn) router.replace(APP_HOME);
       return;
     }
     if (status === "unauthenticated") router.replace("/login");

@@ -1,8 +1,7 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
-import { AppShell } from "@/components/shell/AppShell";
-import { SessionProvider } from "@/components/auth/SessionProvider";
+import { SITE_ORIGIN, siteMetadata } from "@/lib/site";
 
 /**
  * One geometric sans for the whole product. The old cream/gold build also
@@ -17,47 +16,27 @@ const inter = Inter({
 });
 
 /**
- * Absolute origin used to resolve the URL-based metadata fields — chiefly the
- * `opengraph-image` in `app/`, which social scrapers need fully qualified and
- * cannot reach at `localhost`.
+ * The document shell for *every* route, public and private.
  *
- * Precedence:
- *   1. `SITE_URL` — explicit, and wins everywhere (custom domains, hosts that
- *      are not Vercel, or projects that have not enabled system variables).
- *   2. Vercel's production domain — documented as always set, even on preview
- *      deployments, precisely so links that must point at production (OG-image
- *      URLs being the named example) survive a build with no configuration.
- *   3. localhost — development, where the fallback is genuinely correct.
+ * Note what is deliberately absent: the app chrome and the session provider.
+ * Those live in the `(app)` group so a crawler fetching the marketing pages
+ * receives plain HTML with no client-side auth gate in front of it — the single
+ * most important thing for this page set to be indexable.
+ *
+ * `metadataBase` here is what lets every route emit absolute canonical and
+ * Open Graph URLs. Social scrapers cannot resolve a relative URL, and a
+ * relative canonical is silently ignored.
  */
-const vercelProductionHost = process.env.VERCEL_PROJECT_PRODUCTION_URL?.trim();
-
-const siteOrigin =
-  process.env.SITE_URL?.trim() ||
-  (vercelProductionHost
-    ? `https://${vercelProductionHost}`
-    : "http://localhost:3000");
-
-export const metadata: Metadata = {
-  metadataBase: new URL(siteOrigin),
-  title: {
-    default: "VisionaryGene — Receipt Platform",
-    // Each route composes its own full title (see `pageTitle`), so the
-    // template adds nothing by default — signed-out pages append the platform
-    // themselves and signed-in pages lead with the organization's name.
-    template: "%s",
-  },
-  description:
-    "Create, share, and track beautifully branded receipts for your organization — in under a minute.",
-};
+export const metadata: Metadata = siteMetadata;
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="en" className={inter.variable}>
       <body className="min-h-dvh flex flex-col">
-        <SessionProvider>
-          <AppShell>{children}</AppShell>
-        </SessionProvider>
+        {children}
       </body>
     </html>
   );
 }
+
+export { SITE_ORIGIN };

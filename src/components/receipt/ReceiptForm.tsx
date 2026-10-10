@@ -15,10 +15,11 @@ import {
 import { api } from "@/lib/api";
 import { computeTotals, lineTotal } from "@/lib/calc";
 import { formatMoney } from "@/lib/format";
-import type {
-  Customer,
-  PaymentMethod,
-  PaymentStatus,
+import {
+  can,
+  type Customer,
+  type PaymentMethod,
+  type PaymentStatus,
 } from "@/lib/types";
 import { useSession } from "@/components/auth/SessionProvider";
 import { Button } from "@/components/ui/Button";
@@ -68,7 +69,10 @@ export function ReceiptForm({ duplicateOf, prefillCustomerId }: ReceiptFormProps
 
   const [customers, setCustomers] = useState<Customer[]>([]);
   /** The organization's currency — already on the session, no second call. */
-  const currency = useSession().session?.business.currency ?? "NGN";
+  const session = useSession().session;
+  const currency = session?.business.currency ?? "NGN";
+  /** Mirrors the API's `receipt.create` guard so a viewer is offered no submit. */
+  const canIssue = can(session?.role, "receipt.create");
 
   const [selected, setSelected] = useState<{
     id?: string;
@@ -162,7 +166,7 @@ export function ReceiptForm({ duplicateOf, prefillCustomerId }: ReceiptFormProps
     parsedItems.every((item) => item.quantity >= 1 && item.unit_price >= 0);
 
   const canSubmit =
-    !submitting && !prefilling && customerName !== "" && itemsValid;
+    canIssue && !submitting && !prefilling && customerName !== "" && itemsValid;
 
   const matches = query.trim()
     ? customers

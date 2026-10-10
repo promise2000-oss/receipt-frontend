@@ -68,7 +68,7 @@ export function AuthView({ mode }: { mode: Mode }) {
       } else {
         await signIn({ email, password });
       }
-      router.push("/");
+      router.push("/dashboard");
     } catch (caught) {
       setError(
         caught instanceof Error

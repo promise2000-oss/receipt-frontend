@@ -20,6 +20,41 @@
 export type DocumentKind = "receipt" | "invoice";
 export type ExportFormat = "pdf" | "png";
 
+/**
+ * The path segment the API uses for a given format.
+ *
+ * This is a mapping rather than the format itself because the two do not
+ * coincide: a PNG is served from `/:id/image`, not `/:id/png`. Interpolating
+ * the format directly produced a request for a route that does not exist —
+ * which failed as a 404 for PNG while PDF worked, since its name happens to
+ * match. Keeping the translation here means the URL is built in exactly one
+ * place and the convention lives in one constant.
+ */
+const FORMAT_PATH: Record<ExportFormat, string> = {
+  pdf: "pdf",
+  png: "image",
+};
+
+/** `receipts` / `invoices` — the collection a document belongs to. */
+const COLLECTION_PATH: Record<DocumentKind, string> = {
+  receipt: "receipts",
+  invoice: "invoices",
+};
+
+/**
+ * The export URL for a document.
+ *
+ * Exported so the mapping is unit-testable: the failure this replaces was a
+ * 404 that only showed up when a user clicked Download PNG.
+ */
+export function documentExportUrl(
+  kind: DocumentKind,
+  id: string,
+  format: ExportFormat,
+): string {
+  return `/api/${COLLECTION_PATH[kind]}/${encodeURIComponent(id)}/${FORMAT_PATH[format]}`;
+}
+
 export interface ExportResult {
   /** What actually happened, so the UI can describe it honestly. */
   outcome: "shared" | "downloaded";
@@ -42,9 +77,7 @@ export async function fetchDocument(
   id: string,
   format: ExportFormat,
 ): Promise<{ blob: Blob; fileName: string }> {
-  const response = await fetch(`/api/${kind === "receipt" ? "receipts" : "invoices"}/${encodeURIComponent(
-    id,
-  )}/${format}`, {
+  const response = await fetch(documentExportUrl(kind, id, format), {
     credentials: "same-origin",
   });
 

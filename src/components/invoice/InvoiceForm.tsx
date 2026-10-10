@@ -11,7 +11,7 @@ import {
 import { api } from "@/lib/api";
 import { computeTotals, lineTotal } from "@/lib/calc";
 import { formatMoney } from "@/lib/format";
-import type { Customer, InvoiceInput } from "@/lib/types";
+import { can, type Customer, type InvoiceInput } from "@/lib/types";
 import { useSession } from "@/components/auth/SessionProvider";
 import { Button } from "@/components/ui/Button";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
@@ -62,7 +62,20 @@ function isoDate(offsetDays = 0): string {
 
 export function InvoiceForm() {
   const router = useRouter();
-  const currency = useSession().session?.business.currency ?? "NGN";
+  const session = useSession().session;
+  const currency = session?.business.currency ?? "NGN";
+  const role = session?.role ?? "viewer";
+
+  /**
+   * Controls the form offers, from the same matrix the API enforces.
+   *
+   * A viewer reaching this page at all is already refused by the API; hiding
+   * the submit buttons keeps the screen honest rather than offering a button
+   * whose only outcome is a 403. `viewer` can read everything and write
+   * nothing, so the form reduces to a preview.
+   */
+  const canCreate = can(role, "invoice.create");
+  const canIssue = can(role, "invoice.issue");
 
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [selected, setSelected] = useState<{
@@ -114,7 +127,8 @@ export function InvoiceForm() {
     parsedItems.length > 0 &&
     parsedItems.every((item) => item.quantity >= 1 && item.unit_price >= 0);
 
-  const canSubmit = submitting === null && customerName !== "" && itemsValid;
+  const canSubmit =
+    canCreate && submitting === null && customerName !== "" && itemsValid;
 
   const matches = useMemo(() => {
     const needle = query.trim().toLowerCase();
@@ -587,19 +601,21 @@ export function InvoiceForm() {
                   )}
 
                   <div className="mt-5 space-y-2">
-                    <Button
-                      type="button"
-                      size="lg"
-                      className="w-full"
-                      disabled={!canSubmit}
-                      onClick={() => submit(true)}
-                    >
-                      {submitting === "issue" ? "Issuing…" : "Issue Invoice"}
-                    </Button>
+                    {canIssue ? (
+                      <Button
+                        type="button"
+                        size="lg"
+                        className="w-full"
+                        disabled={!canSubmit}
+                        onClick={() => submit(true)}
+                      >
+                        {submitting === "issue" ? "Issuing…" : "Issue Invoice"}
+                      </Button>
+                    ) : null}
                     <Button
                       type="submit"
-                      size="md"
-                      variant="outline"
+                      size={canIssue ? "md" : "lg"}
+                      variant={canIssue ? "outline" : "primary"}
                       className="w-full"
                       disabled={!canSubmit}
                     >
@@ -635,22 +651,20 @@ export function InvoiceForm() {
             </div>
           </div>
           <div className="flex shrink-0 gap-2">
-            <Button
-              type="submit"
-              size="md"
-              variant="outline"
-              disabled={!canSubmit}
-            >
-              Draft
-            </Button>
-            <Button
-              type="button"
-              size="lg"
-              disabled={!canSubmit}
-              onClick={() => submit(true)}
-            >
-              {submitting === "issue" ? "Issuing…" : "Issue"}
-            </Button>
+            {canIssue ? (
+              <Button
+                type="button"
+                size="lg"
+                disabled={!canSubmit}
+                onClick={() => submit(true)}
+              >
+                {submitting === "issue" ? "Issuing…" : "Issue"}
+              </Button>
+            ) : (
+              <Button type="submit" size="lg" disabled={!canSubmit}>
+                {submitting === "draft" ? "Saving…" : "Save Draft"}
+              </Button>
+            )}
           </div>
         </div>
       </form>

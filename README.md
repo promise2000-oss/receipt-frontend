@@ -40,11 +40,144 @@ npm run test    # Vitest (brand/identity unit tests)
 | `/invoices/new` | Create an invoice — line items, tax rate, discount, due date, terms, PO reference. Save as draft, or issue immediately |
 | `/invoices` | Invoice history — search, status filters, and real invoiced / outstanding / overdue totals |
 | `/invoices/[id]` | Invoice document — issue, record payments, export as PDF/PNG, share; cancel with a reason |
+| `/team` | Members, roles and invitations — role-gated throughout |
+| `/accept-invite` | Redeem an invitation and create an account (no session required) |
 | `/customers` | Customer list with lifetime stats + detail drawer |
 | `/settings` | Organization details, website, logo (auto-saves), brand colours, **document watermark**, account |
 
-Every route except `/login` and `/signup` requires a signed-in organization —
-the app shell redirects to `/login` otherwise.
+Every route except `/login`, `/signup` and `/accept-invite` requires a
+signed-in organization — the app shell redirects to `/login` otherwise.
+
+## The public site
+
+The site root is a **public marketing page**; the signed-in application lives
+at `/dashboard`. That split is deliberate: a crawler arriving at the origin
+must find content, not an auth wall — which is the single biggest determinant
+of whether a site can rank at all.
+
+```
+app/
+  layout.tsx        # <html>, fonts, site-wide metadata. No auth, no chrome.
+  sitemap.ts        # public URLs only
+  robots.ts         # guidance + private-route disallow
+  (marketing)/      # public — statically prerendered, no client provider
+    page.tsx  features/  pricing/  about/  contact/  privacy/  terms/
+  (app)/            # signed in — session provider + app chrome
+    layout.tsx      # carries `robots: noindex` for the whole group
+    dashboard/  receipts/  invoices/  customers/  settings/  team/  login/ …
+```
+
+Every marketing page is a **Server Component with no client JavaScript** and
+no data fetching, so a crawler receives finished HTML in the first response.
+The single exception is a `null`-rendering component on the homepage that
+sends an already-signed-in visitor to `/dashboard` — a signed-out visitor, or
+one whose session check fails, simply stays on the marketing page.
+
+### SEO implementation
+
+- **Titles and descriptions** are distinct per page; the root layout supplies
+  `%s · VisionaryGene` as the template, so two pages can never collide on a
+  `<title>`.
+- **Canonical URLs** are emitted on every indexable page from a single
+  `canonical()` helper, so they cannot drift from the served URL.
+- **`noindex`** is declared **once** in `app/(app)/layout.tsx` rather than on
+  each of the ten app pages — a per-page directive is one somebody eventually
+  forgets, and the page that forgets it is a customer's receipt history in a
+  search index.
+- **`robots.txt`** disallows `/api/`, every app route and the auth screens, and
+  points at the sitemap. It is *guidance, not access control*: the real
+  protection for those routes is the session check and the API's tenant
+  scoping. Disallowing keeps crawlers away; it does not make anything private.
+- **`sitemap.xml`** lists only public routes. No dashboard, receipt, invoice,
+  customer, settings, team or auth URL appears in it — a sitemap is a public
+  file, so a private URL in it is a way to discover that the route exists.
+- **Structured data** is limited to types that match visible content:
+  `Organization`, `WebSite`, `SoftwareApplication` and `FAQPage`. There are
+  **no `aggregateRating`, review counts, awards or invented testimonials** —
+  the product has none, and fabricating them is both a lie and a structured-data
+  violation.
+- **Open Graph / Twitter** metadata plus the existing 1200×630 brand card.
+- **Semantic HTML**: one `<h1>` per page in a real `<header>`, `<h2>` per
+  section, `<nav aria-label>` for navigation, `<details>` for the FAQ, and
+  meaningful link text throughout.
+
+### Requires external configuration
+
+These cannot be completed from the codebase and need a deployment step:
+
+| Step | Where |
+| --- | --- |
+| Set `SITE_URL` to the production origin | Vercel → Settings → Environment Variables |
+| Replace the placeholder Google verification token in `src/lib/site.ts` | then verify in Search Console |
+| Submit `https://<origin>/sitemap.xml` | Google Search Console → Sitemaps |
+| Verify the domain in Bing Webmaster Tools | Bing Webmaster Tools |
+
+**No indexing or ranking has been claimed or verified** — that requires the
+submission above and, realistically, weeks of crawl and ranking data.
+
+## Roles & permissions
+
+Four roles, defined once in `@eleos/shared#rbac` and enforced by the API on
+every request. The UI mirrors the matrix only to *hide* controls the server
+would refuse; a disagreement would at worst show a button that 403s.
+
+| Role | Can do |
+| --- | --- |
+| **Owner** | Everything, including ownership handoff and removing other owners |
+| **Admin** | Day-to-day operations: team, receipts, invoices, customers, branding |
+| **Staff** | Issues receipts, records payments, manages customers. No organization settings, no cancelling invoices |
+| **Viewer** | Read-only. No writes at all |
+
+Two rules sit *outside* the permission matrix, because they are about
+relationships rather than capability:
+
+- **You may only act on somebody below your own rank.** This is what stops an
+  `admin` promoting themselves to `owner`, whatever they put in the request
+  body — the guard reads the signed session, never the client.
+- **The organization always keeps an owner.** Demoting or removing the last
+  one is refused.
+
+The one exception to the rank rule: two owners may act on each other, because
+without it ownership handoff would be impossible — an organization could never
+go from "two owners" back to "one".
+
+## Team & invitations
+
+Invitations are **single-organization**: a user belongs to exactly one
+workspace, and an invitation is a request to join *that* one. There is no
+Membership table and no organization switcher.
+
+- The token is 32 random bytes, stored only as a **SHA-256 hash**. A leaked
+  database row is therefore useless — the plaintext exists once, in the
+  response to whoever created the invite, and cannot be retrieved later.
+- Single-use, expires in 72 hours, and revocable.
+- Redemption is atomic: a conditional update (`accepted_at IS NULL`) means two
+  simultaneous redemptions of one token produce **one** member, not two. There
+  is a test that fires three at once.
+- `owner` is not an assignable invite role — ownership is transferred, never
+  invited.
+- Removing somebody who has issued receipts or invoices is refused; the
+  suggested alternative is demoting them to Viewer, so the financial history
+  keeps its author.
+
+## Audit log
+
+Append-only, tenant-scoped, and **read-only by construction** — the API
+registers `GET /api/audit` and nothing else, so no verb anywhere can modify or
+delete an entry.
+
+Recorded: organization/branding/watermark changes, invitations sent/accepted/
+revoked, role changes, member removal, customer changes, receipt created/
+voided/reissued, invoice created/issued/cancelled, and payments recorded.
+
+Each entry carries the organization, the actor, the action, the resource, and
+a timestamp, plus change metadata (old→new role, the void reason, the amount
+and resulting balance). **Metadata holds what changed, never a password,
+token, or customer contact detail** — the log is readable by any role with
+`report.read`, which includes viewers.
+
+Recording is best-effort: an audit write can never roll back the business
+operation it describes.
 
 ## Invoicing
 
@@ -381,7 +514,11 @@ date, customer, line items, subtotal, discount, total, and a QR code.
 ## Project layout
 
 ```
-app/                  # routes only (layouts & pages, incl. generateMetadata)
+app/
+  layout.tsx          # <html>, fonts, site-wide metadata (no auth, no chrome)
+  sitemap.ts robots.ts
+  (marketing)/        # public: statically prerendered, no client provider
+  (app)/              # signed in: session provider + chrome, noindex
                       # + icon.png / apple-icon.png / opengraph-image.png
 app/globals.css       # the ONLY place a hex value is written (`:root` tokens)
 next.config.ts        # /api/* rewrite proxy to API_URL
@@ -393,18 +530,19 @@ src/
     dashboard/        # dashboard view (client child of a server page)
     receipt/          # form, document, preview, history view, share/export bar
     invoice/          # builder, history, detail + payment recording
+    team/             # members, roles, invitations, acceptance
     customers/        # list + drawer
     settings/         # settings form + template preview
     shell/            # top bar, sidebar, bottom nav, app shell (auth gate)
     ui/               # Button, Card, Field, StatusBadge, dialogs, …
   lib/
     api.ts            # HTTP client
+    types.ts          # domain types, roles + the client permission mirror
     calc.ts           # line/total arithmetic (mirrors @eleos/shared)
     export.ts         # PDF/PNG fetch, Web Share API + download fallback
     share.ts          # WhatsApp / email deep links, shareable projection
     brand.ts          # monograms, WCAG contrast, logo sampling, palette
     server/brand.ts   # server-side organization name for page titles
-    types.ts          # domain types
 ```
 
 ### Logo

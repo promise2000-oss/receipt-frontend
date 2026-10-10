@@ -8,6 +8,7 @@ import { useSession } from "@/components/auth/SessionProvider";
 import { invalidateOrgName } from "@/lib/server/brand-actions";
 import { logoSizeError, readImageAsDataUrl, readImageSize } from "@/lib/image";
 import { formatMoney } from "@/lib/format";
+import { can } from "@/lib/types";
 import {
   CONTRAST_TEXT,
   derivePalette,
@@ -358,6 +359,12 @@ export function SettingsView() {
 
   async function save() {
     if (saving) return;
+    // The API refuses this with a 403 for a staff account; refuse it here
+    // too, so the button does not promise something that cannot happen.
+    if (!can(session?.role, "org.update")) {
+      setError("Only an admin or the owner can change organization settings.");
+      return;
+    }
     if (name.trim().length < 2) {
       setError("Business name is required.");
       return;

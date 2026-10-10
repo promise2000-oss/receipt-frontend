@@ -3,7 +3,7 @@
 import Image from "next/image";
 import { cn } from "@/lib/cn";
 import { initials } from "@/lib/brand";
-import { useSession } from "@/components/auth/SessionProvider";
+import { useOptionalSession } from "@/components/auth/SessionProvider";
 
 /**
  * The VisionaryGene mark, extracted from the source artwork to
@@ -61,7 +61,13 @@ export function Logo({
   className,
   compact = false,
 }: LogoProps) {
-  const { session } = useSession();
+  // `useSession` throws when there is no provider, which is the case on the
+  // public marketing pages — they render outside the `(app)` group and must
+  // not depend on an authenticated session to draw the platform's own name.
+  // Reading the context directly and falling back is the same behaviour as
+  // being signed out, which is exactly right for those surfaces.
+  const sessionState = useOptionalSession();
+  const session = sessionState?.session;
 
   const business = session?.business;
   const name = business?.name?.trim();
