@@ -20,6 +20,7 @@ import { Button } from "@/components/ui/Button";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
 import { Field, SelectInput, TextInput } from "@/components/ui/Field";
 import { PageHeader } from "@/components/ui/PageHeader";
+import { describeError, useToast } from "@/components/ui/Toast";
 import { cn } from "@/lib/cn";
 
 const HEX = /^#([0-9a-f]{6})$/i;
@@ -225,6 +226,8 @@ export function SettingsView() {
   const router = useRouter();
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+
+  const toast = useToast();
   const [error, setError] = useState<string | null>(null);
   const { session, signOut, refresh } = useSession();
 
@@ -334,9 +337,7 @@ export function SettingsView() {
     } catch (caught) {
       setLogo(null);
       setLogoStatus("error");
-      setError(
-        caught instanceof Error ? caught.message : "Couldn't save the logo.",
-      );
+      setError(describeError(caught, "Couldn't save the logo."));
     }
   }
 
@@ -348,12 +349,13 @@ export function SettingsView() {
       await api.removeLogo();
       await refresh();
       setLogoStatus("idle");
+      // Removal is the one settings change with no visual trace afterwards,
+      // so without this the user cannot tell it worked from a failed request.
+      toast.success("Logo removed. Your next document will use the initial mark.");
     } catch (caught) {
       setLogo(previous);
       setLogoStatus("error");
-      setError(
-        caught instanceof Error ? caught.message : "Couldn't remove the logo.",
-      );
+      setError(describeError(caught, "Couldn't remove the logo."));
     }
   }
 
@@ -411,10 +413,9 @@ export function SettingsView() {
       router.refresh();
       setSaved(true);
       setTimeout(() => setSaved(false), 2400);
+      toast.success("Settings saved.");
     } catch (caught) {
-      setError(
-        caught instanceof Error ? caught.message : "Couldn't save your changes.",
-      );
+      setError(describeError(caught, "Couldn't save your changes."));
     } finally {
       setSaving(false);
     }

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { AppShell } from "@/components/shell/AppShell";
 import { SessionProvider } from "@/components/auth/SessionProvider";
+import { ToastProvider } from "@/components/ui/Toast";
 
 /**
  * The signed-in application shell.
@@ -34,7 +35,14 @@ export const metadata: Metadata = {
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
     <SessionProvider>
-      <AppShell>{children}</AppShell>
+      {/*
+        Inside the session provider so a toast raised by a data-loading view
+        has a session to report against, and outside `AppShell`'s own subtree
+        so a toast is never clipped by the scroll container the chrome uses.
+      */}
+      <ToastProvider>
+        <AppShell>{children}</AppShell>
+      </ToastProvider>
     </SessionProvider>
   );
 }

@@ -27,6 +27,7 @@ import { Card, CardBody, CardHeader } from "@/components/ui/Card";
 import { Field, TextArea, TextInput } from "@/components/ui/Field";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { SegmentedControl } from "@/components/ui/SegmentedControl";
+import { describeError } from "@/components/ui/Toast";
 
 interface ItemRow {
   key: string;
@@ -218,8 +219,11 @@ export function ReceiptForm({ duplicateOf, prefillCustomerId }: ReceiptFormProps
         notes,
       });
       router.push(`/receipts/${receipt.receipt_number}`);
-    } catch {
-      setError("Something went wrong while issuing the receipt. Please try again.");
+    } catch (caught) {
+      // The server's own reason, not a generic one. It refuses an issued
+      // receipt, a bad item and a stale sequence number for different
+      // reasons, and each needs a different fix from the user.
+      setError(describeError(caught, "Couldn't issue this receipt."));
       setSubmitting(false);
     }
   }

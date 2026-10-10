@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Check, Copy, Download, Mail, Share2, FileImage } from "lucide-react";
 import { Button } from "@/components/ui/Button";
+import { useToast } from "@/components/ui/Toast";
 import { WhatsAppIcon } from "@/components/ui/icons";
 import { emailUrl, whatsappUrl, type ShareableDocument } from "@/lib/share";
 import {
@@ -42,12 +43,16 @@ export function ShareBar({
   kind?: DocumentKind;
 }) {
   const [copied, setCopied] = useState(false);
+  /** Shown when the clipboard refuses, so the link is still obtainable. */
+  const [copyFallback, setCopyFallback] = useState<string | null>(null);
   const [busy, setBusy] = useState<null | "pdf" | "png" | "share">(null);
   const [feedback, setFeedback] = useState<{ tone: "ok" | "error"; text: string } | null>(
     null,
   );
 
   const shareSupported = canShareFiles();
+
+  const toast = useToast();
 
   async function run(
     action: "pdf" | "png" | "share",
@@ -89,9 +94,21 @@ export function ShareBar({
     try {
       await navigator.clipboard.writeText(shareUrl);
     } catch {
-      /* clipboard unavailable — still show confirmation */
+      // This used to fall through to the same "Copied" confirmation, which is
+      // a false success: the clipboard API rejects on a denied permission and
+      // on an insecure origin, and the user would then paste whatever was in
+      // the clipboard before and send it to a customer. The link is offered
+      // instead so the action is still completable.
+      setCopied(false);
+      toast.failure(
+        new Error("Couldn't copy the link. Your browser blocked clipboard access."),
+        "Couldn't copy the link.",
+      );
+      setCopyFallback(shareUrl);
+      return;
     }
     setCopied(true);
+    setCopyFallback(null);
     setTimeout(() => setCopied(false), 2200);
   }
 
@@ -190,6 +207,27 @@ export function ShareBar({
       >
         {feedback?.text ?? ""}
       </p>
+
+      {/*
+        The clipboard can be refused (denied permission, insecure origin), and
+        that is not recoverable by retrying. The link is shown in full so the
+        user can still select and copy it by hand rather than being told to
+        try again at a button that will keep failing.
+      */}
+      {copyFallback && (
+        <div className="rounded-control border border-vg-border bg-vg-surface-2 p-3">
+          <label htmlFor="share-link-fallback" className="block text-[13px] font-medium text-vg-white">
+            Share this link
+          </label>
+          <input
+            id="share-link-fallback"
+            readOnly
+            value={copyFallback}
+            onFocus={(event) => event.currentTarget.select()}
+            className="mt-2 w-full rounded-control border border-vg-border bg-vg-surface-1 px-3 py-2 font-mono text-xs text-vg-text-muted"
+          />
+        </div>
+      )}
 
       {!shareSupported && (
         <p className="text-xs text-vg-text-muted">

@@ -7,6 +7,7 @@ import { AlertCircle } from "lucide-react";
 import { api } from "@/lib/api";
 import { Button } from "@/components/ui/Button";
 import { Field, TextInput } from "@/components/ui/Field";
+import { describeError } from "@/components/ui/Toast";
 
 /**
  * Redeem an invitation and create the account.
@@ -56,11 +57,9 @@ export function AcceptInvite({ token }: { token: string | null }) {
       // Give the message a moment to register before moving on.
       setTimeout(() => router.push("/login"), 1400);
     } catch (caught) {
-      setError(
-        caught instanceof Error
-          ? caught.message
-          : "Couldn't accept this invitation.",
-      );
+      // An expired, already-redeemed or revoked link each have a different
+      // cause, and the user cannot tell them apart from a generic failure.
+      setError(describeError(caught, "Couldn't accept this invitation."));
       setBusy(false);
     }
   }

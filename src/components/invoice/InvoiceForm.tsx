@@ -17,6 +17,7 @@ import { Button } from "@/components/ui/Button";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
 import { Field, TextArea, TextInput } from "@/components/ui/Field";
 import { PageHeader } from "@/components/ui/PageHeader";
+import { describeError } from "@/components/ui/Toast";
 
 /**
  * The invoice builder.
@@ -185,11 +186,9 @@ export function InvoiceForm() {
       const invoice = await api.createInvoice(input);
       router.push(`/invoices/${invoice.invoice_number}`);
     } catch (caught) {
-      setError(
-        caught instanceof Error && caught.message
-          ? caught.message
-          : "Something went wrong while creating the invoice. Please try again.",
-      );
+      // Same helper as every other view, so an overpayment, a bad line item
+      // and an unreachable API each read the same way wherever they surface.
+      setError(describeError(caught, "Couldn't create this invoice."));
       setSubmitting(null);
     }
   }

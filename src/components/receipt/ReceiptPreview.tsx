@@ -16,6 +16,7 @@ import { ReceiptPreviewSkeleton } from "@/components/ui/Skeleton";
 import { ReceiptDocument } from "./ReceiptDocument";
 import { ShareBar } from "./ShareBar";
 import { receiptAsShareable } from "@/lib/share";
+import { describeError, useToast } from "@/components/ui/Toast";
 
 /**
  * Receipt preview — mirrors the PDF, with share actions directly below.
@@ -42,6 +43,8 @@ export function ReceiptPreview({ id }: { id: string }) {
   const [voidBusy, setVoidBusy] = useState(false);
   const [noteTouched, setNoteTouched] = useState(false);
   const [voidError, setVoidError] = useState<string | null>(null);
+
+  const toast = useToast();
 
   useEffect(() => {
     let cancelled = false;
@@ -118,13 +121,15 @@ export function ReceiptPreview({ id }: { id: string }) {
         setVoidOpen(false);
         setVoidNote("");
         setNoteTouched(false);
+        // Voiding is a financial correction and the dialog just closes, so
+        // confirm it out loud — and say the original is kept, because the fear
+        // behind voiding is usually "will this delete my record".
+        toast.success(`Receipt ${updated.receipt_number} voided. It stays in your records.`);
       } else {
         setVoidError("That receipt is already voided, or it no longer exists.");
       }
     } catch (caught) {
-      setVoidError(
-        caught instanceof Error ? caught.message : "Couldn't void this receipt.",
-      );
+      setVoidError(describeError(caught, "Couldn't void this receipt."));
     } finally {
       setVoidBusy(false);
     }

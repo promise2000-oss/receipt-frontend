@@ -8,6 +8,7 @@ import { Logo } from "@/components/brand/Logo";
 import { Button } from "@/components/ui/Button";
 import { Field, TextInput } from "@/components/ui/Field";
 import { useSession } from "./SessionProvider";
+import { describeError } from "@/components/ui/Toast";
 
 type Mode = "signin" | "signup";
 
@@ -70,11 +71,11 @@ export function AuthView({ mode }: { mode: Mode }) {
       }
       router.push("/dashboard");
     } catch (caught) {
-      setError(
-        caught instanceof Error
-          ? caught.message
-          : "Something went wrong — please try again.",
-      );
+      // The API distinguishes "no account with that email" from "wrong
+      // password" from a duplicate organization name, and each needs the user
+      // to do something different. A generic "something went wrong" here is
+      // the single most useless message in the app.
+      setError(describeError(caught, "Couldn't sign you in. Please try again."));
       setBusy(false);
     }
   }

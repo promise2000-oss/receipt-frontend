@@ -22,6 +22,7 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { Field, TextInput } from "@/components/ui/Field";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { SegmentedControl } from "@/components/ui/SegmentedControl";
+import { describeError, useToast } from "@/components/ui/Toast";
 import { SelectInput } from "@/components/ui/Field";
 
 /**
@@ -52,6 +53,8 @@ export function TeamView() {
   /** The one-time invite link, shown once after a successful send. */
   const [issued, setIssued] = useState<Invitation | null>(null);
   const [copied, setCopied] = useState(false);
+
+  const toast = useToast();
 
   const [roleTarget, setRoleTarget] = useState<Member | null>(null);
   const [nextRole, setNextRole] = useState<Role>("staff");
@@ -100,10 +103,13 @@ export function TeamView() {
       setInviteOpen(false);
       setEmail("");
       await load();
+      // Without this the dialog simply closes, and a user who clicks "Send
+      // invite" sees nothing happen — so they send a second one.
+      toast.success(`Invitation sent to ${invitation.email}.`);
     } catch (caught) {
-      setInviteError(
-        caught instanceof Error ? caught.message : "Couldn't send that invitation.",
-      );
+      // A duplicate email, a full owner quota and an invalid address are three
+      // different problems; the server's reason says which.
+      setInviteError(describeError(caught, "Couldn't send that invitation."));
     } finally {
       setInviteBusy(false);
     }
@@ -115,10 +121,9 @@ export function TeamView() {
     try {
       await api.revokeInvitation(invitation.id);
       await load();
+      toast.success(`Invitation to ${invitation.email} revoked.`);
     } catch (caught) {
-      setActionError(
-        caught instanceof Error ? caught.message : "Couldn't revoke that invitation.",
-      );
+      setActionError(describeError(caught, "Couldn't revoke that invitation."));
     } finally {
       setBusy(false);
     }
@@ -126,16 +131,19 @@ export function TeamView() {
 
   async function applyRole() {
     if (!roleTarget) return;
+    const who = roleTarget.full_name || roleTarget.email || "That member";
     setBusy(true);
     setActionError(null);
     try {
       await api.changeMemberRole(roleTarget.id, nextRole);
       setRoleTarget(null);
       await load();
+      // A role change is permission-altering and silently self-validating, so
+      // it is confirmed out loud. This also covers the last-owner refusal,
+      // which is the message a user is most likely to need to read.
+      toast.success(`${who} is now ${nextRole}.`);
     } catch (caught) {
-      setActionError(
-        caught instanceof Error ? caught.message : "Couldn't change that role.",
-      );
+      setActionError(describeError(caught, "Couldn't change that role."));
     } finally {
       setBusy(false);
     }
@@ -143,16 +151,16 @@ export function TeamView() {
 
   async function remove() {
     if (!removeTarget) return;
+    const who = removeTarget.full_name || removeTarget.email || "That member";
     setBusy(true);
     setActionError(null);
     try {
       await api.removeMember(removeTarget.id);
       setRemoveTarget(null);
       await load();
+      toast.success(`${who} removed from your organization.`);
     } catch (caught) {
-      setActionError(
-        caught instanceof Error ? caught.message : "Couldn't remove that member.",
-      );
+      setActionError(describeError(caught, "Couldn't remove that member."));
     } finally {
       setBusy(false);
     }

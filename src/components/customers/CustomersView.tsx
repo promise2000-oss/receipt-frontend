@@ -21,6 +21,7 @@ import { Card, CardBody } from "@/components/ui/Card";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Field, TextInput } from "@/components/ui/Field";
+import { useToast } from "@/components/ui/Toast";
 import { LoadError } from "@/components/ui/LoadError";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { ListSkeleton } from "@/components/ui/Skeleton";
@@ -50,6 +51,8 @@ export function CustomersView() {
   const [newPhone, setNewPhone] = useState("");
   const [newEmail, setNewEmail] = useState("");
   const [saving, setSaving] = useState(false);
+
+  const toast = useToast();
   const [saveTouched, setSaveTouched] = useState(false);
 
   function fetchAll() {
@@ -143,6 +146,9 @@ export function CustomersView() {
       return;
     }
 
+    // Named, because "a customer called that" is otherwise unfindable in a
+    // long list, and a silent close reads as a failed save.
+    toast.success(`${newName.trim()} added to your customers.`);
     setModalOpen(false);
     setNewName("");
     setNewPhone("");

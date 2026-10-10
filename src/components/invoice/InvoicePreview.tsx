@@ -34,6 +34,7 @@ import { Field, TextArea, TextInput } from "@/components/ui/Field";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { SegmentedControl } from "@/components/ui/SegmentedControl";
 import { InvoiceSkeleton } from "@/components/ui/Skeleton";
+import { describeError, useToast } from "@/components/ui/Toast";
 
 /**
  * One invoice: the document, its lifecycle actions, and its payment history.
@@ -76,9 +77,13 @@ export function InvoicePreview({ id }: { id: string }) {
   const [payError, setPayError] = useState<string | null>(null);
   const [amountTouched, setAmountTouched] = useState(false);
 
+  const toast = useToast();
+
   const [cancelOpen, setCancelOpen] = useState(false);
   const [cancelReason, setCancelReason] = useState("");
   const [cancelBusy, setCancelBusy] = useState(false);
+  /** Its own slot: cancellation writes here, not into the payment error. */
+  const [cancelError, setCancelError] = useState<string | null>(null);
 
   const [issueBusy, setIssueBusy] = useState(false);
   const [issueError, setIssueError] = useState<string | null>(null);
@@ -176,10 +181,21 @@ export function InvoicePreview({ id }: { id: string }) {
       setReference("");
       setAmount("");
       router.refresh();
-    } catch (caught) {
-      setPayError(
-        caught instanceof Error ? caught.message : "Couldn't record that payment.",
+      // Naming the receipt makes it findable, and the balance is the number
+      // the user actually wants to know after paying.
+      toast.success(
+        result.receipt?.receipt_number
+          ? `${formatMoney(parsedAmount)} received — receipt ${result.receipt.receipt_number}. ${
+              result.invoice.balance_due > 0
+                ? `${formatMoney(result.invoice.balance_due)} still outstanding.`
+                : "Paid in full."
+            }`
+          : `${formatMoney(parsedAmount)} received.`,
       );
+    } catch (caught) {
+      // The server refuses an overpayment with the exact figure that is
+      // outstanding; that number is the answer, so it is not replaced.
+      setPayError(describeError(caught, "Couldn't record that payment."));
     } finally {
       setPayBusy(false);
     }
@@ -189,12 +205,12 @@ export function InvoicePreview({ id }: { id: string }) {
     setIssueBusy(true);
     setIssueError(null);
     try {
-      setInvoice(await api.issueInvoice(invoice!.invoice_number));
+      const issued = await api.issueInvoice(invoice!.invoice_number);
+      setInvoice(issued);
       router.refresh();
+      toast.success(`Invoice ${issued.invoice_number} issued. It can no longer be edited.`);
     } catch (caught) {
-      setIssueError(
-        caught instanceof Error ? caught.message : "Couldn't issue this invoice.",
-      );
+      setIssueError(describeError(caught, "Couldn't issue this invoice."));
     } finally {
       setIssueBusy(false);
     }
@@ -203,15 +219,23 @@ export function InvoicePreview({ id }: { id: string }) {
   async function cancel() {
     if (cancelReason.trim().length < 3) return;
     setCancelBusy(true);
+    setCancelError(null);
     try {
-      setInvoice(await api.cancelInvoice(invoice!.invoice_number, cancelReason.trim()));
+      const cancelled = await api.cancelInvoice(
+        invoice!.invoice_number,
+        cancelReason.trim(),
+      );
+      setInvoice(cancelled);
       setCancelOpen(false);
       setCancelReason("");
       router.refresh();
+      // Cancellation is destructive and irreversible, so it is confirmed out
+      // loud rather than left to be inferred from the badge changing.
+      toast.success(`Invoice ${cancelled.invoice_number} cancelled. It stays in your records.`);
     } catch (caught) {
-      setPayError(
-        caught instanceof Error ? caught.message : "Couldn't cancel this invoice.",
-      );
+      // Its own error slot: writing this to the payment error left the reason
+      // invisible, because the payment dialog was closed.
+      setCancelError(describeError(caught, "Couldn't cancel this invoice."));
     } finally {
       setCancelBusy(false);
     }
@@ -683,10 +707,10 @@ export function InvoicePreview({ id }: { id: string }) {
             className="min-h-20"
           />
         </label>
-        {payError && (
+        {cancelError && (
           <p role="alert" className="mt-2 flex items-start gap-1.5 text-xs text-vg-error">
             <AlertCircle className="mt-px h-3.5 w-3.5 shrink-0" aria-hidden />
-            <span>{payError}</span>
+            <span>{cancelError}</span>
           </p>
         )}
       </ConfirmDialog>

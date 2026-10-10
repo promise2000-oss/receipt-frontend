@@ -85,7 +85,7 @@ export class ApiError extends Error {
 
 /**
  * Copy for a rejected read, safe to render inline.
- *
+
  * A view that only ever `.then()`s its fetch has nowhere to put a failure, so
  * it surfaces as an unhandled rejection while the reader watches a skeleton
  * that will never resolve — "slow" rather than "broken". Every caller ends up
