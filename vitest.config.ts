@@ -21,7 +21,14 @@ export default defineConfig({
     },
   },
   test: {
-    include: ["src/**/*.test.ts"],
+    // `.tsx` is included for component tests. They opt into a DOM per file
+    // with a `@vitest-environment jsdom` docblock rather than moving the whole
+    // suite into jsdom: everything else here is colour maths, string handling
+    // or a stubbed `fetch`, and a DOM would only slow it down.
+    include: ["src/**/*.test.ts", "src/**/*.test.tsx"],
     environment: "node",
+    // Component tests use `@testing-library/jest-dom` matchers (`toHaveValue`,
+    // `toHaveAttribute`), which are not built into Vitest's expect.
+    setupFiles: ["./src/test/setup-dom.ts"],
   },
 });

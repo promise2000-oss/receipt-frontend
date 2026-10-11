@@ -33,12 +33,44 @@ export function ConfirmDialog({
 }: ConfirmDialogProps) {
   const dialogRef = useRef<HTMLDivElement>(null);
 
+  /**
+   * The Escape handler needs the *current* `onClose` and `busy`, but this
+   * effect must not depend on them.
+   *
+   * Every call site passes `onClose` as an inline arrow (`onClose={() => …}`),
+   * so its identity changes on every parent render — which is every keystroke.
+   * With `onClose` in the dependency array the effect re-ran on each one and
+   * called `dialogRef.current.focus()`, pulling focus off the input and onto
+   * the dialog container: the user typed one character, the field blurred, and
+   * the text they had already entered stayed put because the state was never
+   * the problem. `busy` had the same effect, stealing focus again when a
+   * submit started and finished.
+   *
+   * These refs are refreshed after every render (see the effect below) so the
+   * keydown listener always closes over fresh values without ever re-running.
+   */
+  const onCloseRef = useRef(onClose);
+  const busyRef = useRef(busy);
+
+  // Declared *before* the `open` effect so the refs are already current when it
+  // runs — effects execute in declaration order.
+  useEffect(() => {
+    onCloseRef.current = onClose;
+    busyRef.current = busy;
+  });
+
   useEffect(() => {
     if (!open) return;
-    dialogRef.current?.focus();
+
+    // Only claim focus if nothing inside already holds it. A dialog containing
+    // an `autoFocus` field has already placed the caret where the user needs
+    // it, and yanking it back is the same bug from the other direction.
+    if (!dialogRef.current?.contains(document.activeElement)) {
+      dialogRef.current?.focus();
+    }
 
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape" && !busy) onClose();
+      if (event.key === "Escape" && !busyRef.current) onCloseRef.current();
     };
     document.addEventListener("keydown", onKeyDown);
     document.body.style.overflow = "hidden";
@@ -46,7 +78,7 @@ export function ConfirmDialog({
       document.removeEventListener("keydown", onKeyDown);
       document.body.style.overflow = "";
     };
-  }, [open, busy, onClose]);
+  }, [open]);
 
   if (!open) return null;
 
