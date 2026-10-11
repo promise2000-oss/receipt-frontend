@@ -187,11 +187,22 @@ export function ReceiptDocument({
         </div>
 
         {/* Itemized table */}
+        {/*
+          The table scrolls *inside its own card* rather than widening the
+          page. Four columns of content have a minimum width that exceeds a
+          320px viewport, and letting that push outward produced 7px of
+          horizontal scroll on the whole document — the kind of defect that
+          makes an otherwise-correct page feel broken on a phone.
+
+          `min-w-[440px]` keeps the columns legible instead of crushing the
+          description into one character per line, which is what `table-fixed`
+          would have done to it.
+        */}
         <div
-          className="mt-6 overflow-hidden rounded-[10px] border"
+          className="mt-6 overflow-x-auto rounded-[10px] border"
           style={{ borderColor: tint(accent, 25) }}
         >
-          <table className="w-full border-collapse text-sm">
+          <table className="w-full min-w-[440px] border-collapse text-sm">
             <thead className="doc-table-head" style={{ backgroundColor: primary }}>
               <tr>
                 <th
@@ -320,15 +331,25 @@ export function ReceiptDocument({
                 design surface: the format fixes its contrast, so tinting it
                 with a brand token would be a regression, not theming.
               */}
-              <QRCodeSVG
-                value={verifyUrl}
-                size={96}
-                marginSize={3}
-                bgColor={QR_BG}
-                fgColor={QR_FG}
-                level="M"
-              />
-              <figcaption className="max-w-[200px]">
+              {/*
+                `shrink-0` is a correctness requirement, not a layout
+                preference. Inside an `inline-flex` figure the QR was the
+                shrinkable item, so on a 320px screen it collapsed from 96px
+                to roughly 20px — which looks like a decorative icon and stops
+                scanning entirely. The URL beside it is the part that should
+                give way, so it is the part that gets `min-w-0`.
+              */}
+              <span className="shrink-0">
+                <QRCodeSVG
+                  value={verifyUrl}
+                  size={96}
+                  marginSize={3}
+                  bgColor={QR_BG}
+                  fgColor={QR_FG}
+                  level="M"
+                />
+              </span>
+              <figcaption className="min-w-0 max-w-[150px] sm:max-w-[200px]">
                 <div className="text-[10px] font-medium uppercase tracking-[0.2em] text-vg-paper-muted">
                   Scan to verify
                 </div>

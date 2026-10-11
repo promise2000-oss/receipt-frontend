@@ -33,7 +33,18 @@ export function TopBar() {
   return (
     <header className="no-print sticky top-0 z-40 border-b border-vg-border bg-vg-surface-1">
       <div className="flex h-16 items-center gap-3 px-4 sm:gap-4 sm:px-6 lg:px-8">
-        <Link href="/dashboard" aria-label="VisionaryGene dashboard" className="shrink-0">
+        {/*
+          `min-h-11` on the link rather than on the logo: the mark is 36px, so
+          the tap target was 36px tall — under the 44px minimum — even though
+          the visual is unchanged. `min-w-0` lets the wordmark truncate before
+          the row is squeezed, which is what happened to the search icon at
+          320px (it collapsed from 44px to 22px).
+        */}
+        <Link
+          href="/dashboard"
+          aria-label="VisionaryGene dashboard"
+          className="flex min-h-11 min-w-0 shrink items-center"
+        >
           <Logo showTagline={false} />
         </Link>
 
@@ -46,7 +57,7 @@ export function TopBar() {
             />
             <Link
               href="/settings"
-              className="hidden min-w-0 items-center gap-2.5 rounded-control px-2 py-1.5 transition-colors hover:bg-vg-surface-2 lg:flex"
+              className="hidden min-h-11 min-w-0 items-center gap-2.5 rounded-control px-2 py-1.5 transition-colors hover:bg-vg-surface-2 lg:flex"
             >
               {orgLogo ? (
                 // eslint-disable-next-line @next/next/no-img-element
@@ -68,7 +79,7 @@ export function TopBar() {
                 <span className="block truncate text-[13px] font-medium leading-tight text-vg-white">
                   {orgName}
                 </span>
-                <span className="block text-[10px] uppercase leading-tight tracking-[0.14em] text-vg-text-muted">
+                <span className="block text-[11px] uppercase leading-tight tracking-[0.14em] text-vg-text-muted">
                   Workspace
                 </span>
               </span>
@@ -99,14 +110,25 @@ export function TopBar() {
         <Link
           href="/receipts"
           aria-label="Search receipts"
-          className="ml-auto grid h-11 w-11 place-items-center rounded-control border border-vg-border text-vg-white transition-colors hover:bg-vg-surface-2 md:hidden"
+          // `shrink-0` keeps this at its full 44px. As a plain flex item it was
+          // compressed to 22px wide on a 320px screen — a target half the size
+          // it appears to be.
+          className="ml-auto grid h-11 w-11 shrink-0 place-items-center rounded-control border border-vg-border text-vg-white transition-colors hover:bg-vg-surface-2 md:hidden"
         >
           <Search className="h-5 w-5" strokeWidth={2} />
         </Link>
 
-        <ButtonLink href="/receipts/new" variant="primary" aria-label="New Receipt">
-          <Plus className="h-4 w-4" strokeWidth={2.5} />
-          <span className="sm:hidden">New</span>
+        <ButtonLink
+          href="/receipts/new"
+          variant="primary"
+          aria-label="New Receipt"
+          // Below `xs` the row has logo + search + this, and this one is
+          // allowed to give way. It keeps its 44px height either way; only the
+          // label shortens, so the target never shrinks.
+          className="shrink-0 px-3 sm:px-5"
+        >
+          <Plus className="h-4 w-4 shrink-0" strokeWidth={2.5} />
+          <span className="hidden min-[380px]:inline">New</span>
           <span className="hidden sm:inline">New Receipt</span>
         </ButtonLink>
       </div>

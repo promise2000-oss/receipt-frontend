@@ -62,7 +62,15 @@ export function ConfirmDialog({
         aria-modal="true"
         aria-label={title}
         tabIndex={-1}
-        className="w-full max-w-md rounded-card border border-vg-border bg-vg-surface-2 p-6 outline-none"
+        // `max-h` + `overflow-y-auto`: below `sm` this is a bottom sheet, so a
+        // tall dialog (the void and cancel forms carry a textarea) would grow
+        // upward past the top of a short screen with the confirm button out of
+        // reach. Scrolling the panel keeps both the reason and the buttons
+        // reachable, and `overscroll-contain` stops the page behind moving.
+        //
+        // `pb-[max(1.5rem,env(safe-area-inset-bottom))]` keeps the action row
+        // clear of the iOS home indicator, which a plain `p-6` sits under.
+        className="w-full max-w-md max-h-[calc(100dvh-2rem)] overflow-y-auto overscroll-contain rounded-card border border-vg-border bg-vg-surface-2 p-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] outline-none"
         onMouseDown={(event) => event.stopPropagation()}
       >
         <h2 className="text-xl font-semibold tracking-tight text-vg-white">

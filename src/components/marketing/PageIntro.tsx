@@ -23,7 +23,7 @@ export function PageIntro({
     <section className="border-b border-vg-border">
       <div className="mx-auto w-full max-w-6xl px-4 py-16 sm:px-6 sm:py-20">
         <header className="max-w-3xl">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-vg-accent-text">
+          <p className="text-[12px] font-semibold uppercase tracking-[0.22em] text-vg-accent-text">
             {eyebrow}
           </p>
           <h1 className="mt-5 text-4xl font-semibold leading-[1.1] tracking-tight text-vg-white sm:text-5xl">

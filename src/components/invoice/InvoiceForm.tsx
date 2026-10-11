@@ -383,13 +383,13 @@ export function InvoiceForm() {
                             }
                             placeholder="e.g. Brand identity design"
                             aria-label="Item description"
-                            className="pr-10"
+                            className="pr-11"
                           />
                           <button
                             type="button"
                             onClick={() => removeRow(row.key)}
                             aria-label="Remove item"
-                            className="absolute right-2 top-1/2 grid h-7 w-7 -translate-y-1/2 place-items-center rounded-full text-vg-text-muted transition-colors hover:bg-vg-surface-3 hover:text-vg-white sm:hidden"
+                            className="absolute right-0 top-1/2 grid h-11 w-11 -translate-y-1/2 place-items-center rounded-full text-vg-text-muted transition-colors hover:bg-vg-surface-3 hover:text-vg-white sm:hidden"
                           >
                             <Trash2 className="h-4 w-4" strokeWidth={1.8} />
                           </button>
@@ -441,7 +441,7 @@ export function InvoiceForm() {
                             type="button"
                             onClick={() => removeRow(row.key)}
                             aria-label="Remove item"
-                            className="grid h-9 w-9 place-items-center rounded-full text-vg-text-muted transition-colors hover:bg-vg-surface-3 hover:text-vg-white"
+                            className="grid h-11 w-11 place-items-center rounded-full text-vg-text-muted transition-colors hover:bg-vg-surface-3 hover:text-vg-white"
                           >
                             <Trash2 className="h-4 w-4" strokeWidth={1.8} />
                           </button>

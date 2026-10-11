@@ -24,7 +24,10 @@ export function Wordmark({ className }: { className?: string }) {
   return (
     <span
       className={cn(
-        "text-[15px] font-bold uppercase leading-none tracking-[0.16em] sm:text-[17px]",
+        // Tracking eases off below `sm`: at 0.16em the 13-character wordmark is
+        // the widest element in the mobile header, and it is the first thing
+        // that has to give when the viewport is 320px.
+        "text-[15px] font-bold uppercase leading-none tracking-[0.1em] sm:text-[17px] sm:tracking-[0.16em]",
         className,
       )}
     >
@@ -106,7 +109,10 @@ export function Logo({
   if (compact) return mark;
 
   return (
-    <span className={cn("flex items-center gap-3", className)}>
+    // `min-w-0` so this can actually shrink inside a flex row. Without it the
+    // child is sized by its content, the parent cannot squeeze it, and a
+    // narrow viewport scrolls horizontally instead.
+    <span className={cn("flex min-w-0 items-center gap-2.5 sm:gap-3", className)}>
       {mark}
       <span className="flex min-w-0 flex-col leading-none">
         {name ? (
@@ -117,7 +123,10 @@ export function Logo({
           <Wordmark />
         )}
         {showTagline && (
-          <span className="mt-1.5 truncate text-[9px] font-medium uppercase tracking-[0.34em] text-vg-accent-text">
+          // 9px was unreadable, and at 0.34em tracking it was also wide enough
+          // to force the header past a 320px viewport. The tracking gives way
+          // before the size does, since the size is what carries legibility.
+          <span className="mt-1.5 truncate text-[11px] font-medium uppercase tracking-[0.18em] text-vg-accent-text sm:tracking-[0.34em]">
             {name ? "Powered by VisionaryGene" : "Receipt Platform"}
           </span>
         )}

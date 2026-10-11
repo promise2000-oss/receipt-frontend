@@ -365,8 +365,15 @@ export function InvoicePreview({ id }: { id: string }) {
       </div>
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px] lg:items-start">
-        {/* ---- The document ---- */}
-        <div className="mx-auto w-full max-w-3xl">
+        {/*
+          `min-w-0` is load-bearing, not decoration. A grid item defaults to
+          `min-width: auto`, which means it refuses to shrink below its
+          content's min-content width. The document's itemised table sets a
+          `min-w-[440px]`, so without this the whole column — and with it the
+          page — was pushed 110px past a 390px viewport, and the table's own
+          scroll container never engaged.
+        */}
+        <div className="mx-auto w-full min-w-0 max-w-3xl">
           <article className="rounded-card border border-vg-border bg-vg-surface-2 p-5 sm:p-8">
             <header className="flex flex-wrap items-start justify-between gap-4 border-b border-vg-border pb-5">
               <div className="min-w-0">
@@ -428,8 +435,14 @@ export function InvoicePreview({ id }: { id: string }) {
               </div>
             </div>
 
-            <div className="mt-6 overflow-hidden rounded-[10px] border border-vg-border">
-              <table className="w-full border-collapse text-sm">
+            {/*
+              Scrolls within its own card rather than widening the page — the
+              same reason and the same `min-w` as the receipt document. The
+              columns need more room than a 320px screen has, and crushing
+              them is worse than a contained scroll.
+            */}
+            <div className="mt-6 overflow-x-auto rounded-[10px] border border-vg-border">
+              <table className="w-full min-w-[440px] border-collapse text-sm">
                 <thead className="bg-vg-surface-1">
                   <tr>
                     {["Description", "Qty", "Unit Price", "Total"].map((heading, index) => (
@@ -533,7 +546,7 @@ export function InvoicePreview({ id }: { id: string }) {
         </div>
 
         {/* ---- Payment history ---- */}
-        <aside className="no-print space-y-4">
+        <aside className="no-print min-w-0 space-y-4">
           <Card>
             <CardHeader
               title="Payments"

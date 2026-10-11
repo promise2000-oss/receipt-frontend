@@ -19,13 +19,21 @@ export function MarketingHeader({
 }) {
   return (
     <header className="sticky top-0 z-40 border-b border-vg-border bg-vg-black/85 backdrop-blur">
-      <div className="mx-auto flex h-16 w-full max-w-6xl items-center gap-6 px-4 sm:px-6">
+      <div className="mx-auto flex h-16 w-full max-w-6xl items-center gap-3 px-4 sm:gap-6 sm:px-6">
+        {/*
+          `min-w-0` with no `shrink-0` is the structural guarantee that this
+          row cannot overflow. The logo was previously `shrink-0` and rigid, so
+          on a 320px screen the wordmark, the tagline and two buttons together
+          exceeded the viewport and every marketing page scrolled sideways —
+          102px of it. Letting this child shrink means the *wordmark* absorbs the
+          pressure (it already truncates) instead of the page scrolling.
+        */}
         <Link
           href="/"
-          className="flex shrink-0 items-center gap-2.5"
+          className="flex min-h-11 min-w-0 items-center gap-2.5"
           aria-label="VisionaryGene home"
         >
-          <Logo className="h-7 w-auto" />
+          <Logo className="h-7 w-auto sm:h-8" />
         </Link>
 
         <nav aria-label="Main" className="hidden min-w-0 flex-1 md:block">
@@ -52,7 +60,17 @@ export function MarketingHeader({
         </nav>
 
         <div className="ml-auto flex shrink-0 items-center gap-2">
-          <ButtonLink href="/login" variant="ghost" size="sm">
+          {/*
+            "Sign in" is the secondary path and is reachable from the footer on
+            every one of these pages, so dropping it below `sm` buys the
+            primary action room instead of pushing the row past the viewport.
+          */}
+          <ButtonLink
+            href="/login"
+            variant="ghost"
+            size="sm"
+            className="hidden sm:inline-flex"
+          >
             Sign in
           </ButtonLink>
           <ButtonLink href="/signup" size="sm">

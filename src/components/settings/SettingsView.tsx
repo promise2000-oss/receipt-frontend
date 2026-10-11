@@ -630,7 +630,7 @@ export function SettingsView() {
                 type="checkbox"
                 checked={watermarkEnabled}
                 onChange={(event) => setWatermarkEnabled(event.target.checked)}
-                className="mt-1 h-6 w-6 shrink-0 accent-vg-red-900"
+                className="mt-1 h-7 w-7 shrink-0 accent-vg-red-900"
                 aria-label="Show the watermark"
               />
             </label>

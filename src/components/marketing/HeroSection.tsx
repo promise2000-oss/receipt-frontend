@@ -12,7 +12,7 @@ export function HeroSection() {
     <section className="border-b border-vg-border">
       <div className="mx-auto w-full max-w-6xl px-4 py-20 sm:px-6 sm:py-28">
         <div className="max-w-3xl">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-vg-accent-text">
+          <p className="text-[12px] font-semibold uppercase tracking-[0.22em] text-vg-accent-text">
             Receipt &amp; invoicing platform
           </p>
 
