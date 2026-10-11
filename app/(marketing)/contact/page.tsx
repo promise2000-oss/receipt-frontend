@@ -52,7 +52,7 @@ export default function ContactPage() {
               <p className="text-sm leading-relaxed text-vg-text-muted">
                 Email:{" "}
                 <span className="font-medium text-vg-white">
-                  support@visionarygene.com
+                  promiseshedrack02@gmail.com
                 </span>
               </p>
             )}
