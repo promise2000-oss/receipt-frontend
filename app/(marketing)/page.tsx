@@ -4,6 +4,7 @@ import { HeroSection } from "@/components/marketing/HeroSection";
 import { FeatureGrid } from "@/components/marketing/FeatureGrid";
 import { HowItWorks } from "@/components/marketing/HowItWorks";
 import { SecuritySection } from "@/components/marketing/SecuritySection";
+import { CustomerStories } from "@/components/marketing/CustomerStories";
 import { CtaBand } from "@/components/marketing/CtaBand";
 import { FAQSection } from "@/components/marketing/FAQSection";
 import { RedirectSignedInUsers } from "@/components/marketing/RedirectSignedInUsers";
@@ -100,6 +101,7 @@ export default function HomePage() {
       <FeatureGrid />
       <HowItWorks />
       <SecuritySection />
+      <CustomerStories />
       <FAQSection />
       <CtaBand />
     </>
